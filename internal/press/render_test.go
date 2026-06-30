@@ -3,7 +3,6 @@ package press
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -454,5 +453,112 @@ func TestRenderIntegration(t *testing.T) {
 
 func boolPtr(b bool) *bool { return &b }
 
-// Ensure we import exec for potential future use
-var _ = exec.Command
+func TestDetectTypstNotFound(t *testing.T) {
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", "")
+	defer os.Setenv("PATH", origPath)
+
+	info := DetectTypst(context.Background(), "")
+	if info.Available {
+		t.Error("expected Available=false when typst not on PATH")
+	}
+	if info.Path != "" {
+		t.Errorf("expected empty Path, got %q", info.Path)
+	}
+	if !strings.Contains(info.Hint, "Install") {
+		t.Errorf("expected install hint, got %q", info.Hint)
+	}
+}
+
+func TestDetectTypstWithOverride(t *testing.T) {
+	binDir := t.TempDir()
+	mockTypst(t, binDir, true)
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", "")
+	defer os.Setenv("PATH", origPath)
+
+	info := DetectTypst(context.Background(), filepath.Join(binDir, "typst"))
+	if !info.Available {
+		t.Error("expected Available=true with valid override")
+	}
+	if info.Path != filepath.Join(binDir, "typst") {
+		t.Errorf("path = %q, want %q", info.Path, filepath.Join(binDir, "typst"))
+	}
+}
+
+func TestDetectTypstVersionParsing(t *testing.T) {
+	binDir := t.TempDir()
+	script := "#!/bin/sh\necho 'typst 0.15.0 (abcd1234)'\n"
+	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", "")
+	defer os.Setenv("PATH", origPath)
+
+	info := DetectTypst(context.Background(), filepath.Join(binDir, "typst"))
+	if !info.Available {
+		t.Error("expected Available=true")
+	}
+	if info.Version != "0.15.0" {
+		t.Errorf("version = %q, want %q", info.Version, "0.15.0")
+	}
+}
+
+func TestDetectTypstVersionParseError(t *testing.T) {
+	binDir := t.TempDir()
+	script := "#!/bin/sh\necho 'typst'\n"
+	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", "")
+	defer os.Setenv("PATH", origPath)
+
+	info := DetectTypst(context.Background(), filepath.Join(binDir, "typst"))
+	if !info.Available {
+		t.Error("expected Available=true")
+	}
+	if info.Version != "" {
+		t.Errorf("expected empty version for unexpected format, got %q", info.Version)
+	}
+}
+
+func TestTypstVersionSuccess(t *testing.T) {
+	binDir := t.TempDir()
+	script := "#!/bin/sh\necho 'typst 0.15.0 (abcd1234)'\n"
+	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	v := typstVersion(context.Background(), filepath.Join(binDir, "typst"))
+	if v != "0.15.0" {
+		t.Errorf("typstVersion() = %q, want %q", v, "0.15.0")
+	}
+}
+
+func TestTypstVersionFailure(t *testing.T) {
+	binDir := t.TempDir()
+	script := "#!/bin/sh\nexit 1\n"
+	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	v := typstVersion(context.Background(), filepath.Join(binDir, "typst"))
+	if v != "" {
+		t.Errorf("expected empty version on failure, got %q", v)
+	}
+}
+
+func TestTypstVersionShortOutput(t *testing.T) {
+	binDir := t.TempDir()
+	script := "#!/bin/sh\necho 'typst'\n"
+	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	v := typstVersion(context.Background(), filepath.Join(binDir, "typst"))
+	if v != "" {
+		t.Errorf("expected empty version for short output, got %q", v)
+	}
+}
