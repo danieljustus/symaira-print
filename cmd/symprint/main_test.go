@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/danieljustus/symaira-corekit/exitcodes"
+	"github.com/danieljustus/symaira-print/internal/config"
 	"github.com/danieljustus/symaira-print/internal/press"
 )
 
@@ -182,6 +186,55 @@ func TestSevGlyph(t *testing.T) {
 	}
 	if got := sevGlyph("warning"); got != "!" {
 		t.Errorf("sevGlyph(warning) = %q, want !", got)
+	}
+}
+
+func TestEngineFromConfig(t *testing.T) {
+	cfg := &config.Config{
+		Engine: config.Engine{
+			Typst:             "/usr/local/bin/typst",
+			FontPaths:         []string{"/fonts/a", "/fonts/b"},
+			IgnoreSystemFonts: true,
+			TimeoutSeconds:    30,
+		},
+	}
+	got := engineFromConfig(cfg)
+	if got.TypstBin != cfg.Engine.Typst {
+		t.Errorf("TypstBin = %q, want %q", got.TypstBin, cfg.Engine.Typst)
+	}
+	if len(got.FontPaths) != 2 || got.FontPaths[0] != "/fonts/a" || got.FontPaths[1] != "/fonts/b" {
+		t.Errorf("FontPaths = %v, want %v", got.FontPaths, cfg.Engine.FontPaths)
+	}
+	if !got.IgnoreSystemFonts {
+		t.Error("IgnoreSystemFonts should be true")
+	}
+	if got.Timeout != 30*time.Second {
+		t.Errorf("Timeout = %v, want %v", got.Timeout, 30*time.Second)
+	}
+}
+
+func TestPrintJSON(t *testing.T) {
+	out := captureStdout(t, func() {
+		if err := printJSON(map[string]any{"a": 1, "b": "two"}); err != nil {
+			t.Fatalf("printJSON() error = %v", err)
+		}
+	})
+	var got map[string]any
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	if got["b"] != "two" {
+		t.Errorf("b = %v, want %q", got["b"], "two")
+	}
+	if !strings.Contains(out, "  ") {
+		t.Error("expected indented JSON output")
+	}
+}
+
+func TestPrintJSON_MarshalError(t *testing.T) {
+	// Channels are not JSON-marshalable, so this exercises the error branch.
+	if err := printJSON(map[string]any{"bad": make(chan int)}); err == nil {
+		t.Fatal("expected an error for an unmarshalable value")
 	}
 }
 
