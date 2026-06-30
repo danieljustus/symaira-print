@@ -42,12 +42,15 @@
     paper: "a4",
     margin: (left: 25mm, right: 20mm, top: 0mm, bottom: 20mm),
     numbering: none,
-    // Fold + hole marks live in the left margin. Decorative → Phase 1 wraps
-    // these in pdf.artifact() so they are ignored by assistive tech.
+    // Fold + hole marks are page artifacts — not document content, but printing
+    // aids. Wrapped in pdf.artifact(kind: "page") for PDF/UA compliance so
+    // assistive technology ignores them in the reading order.
     background: {
-      place(top + left, dx: 5mm, dy: 148.5mm, line(length: 4mm, stroke: 0.3pt))
-      place(top + left, dx: 5mm, dy: falz1, line(length: 4mm, stroke: 0.3pt))
-      place(top + left, dx: 5mm, dy: falz2, line(length: 4mm, stroke: 0.3pt))
+      pdf.artifact(kind: "page")[
+        #place(top + left, dx: 5mm, dy: 148.5mm, line(length: 4mm, stroke: 0.3pt))
+        #place(top + left, dx: 5mm, dy: falz1, line(length: 4mm, stroke: 0.3pt))
+        #place(top + left, dx: 5mm, dy: falz2, line(length: 4mm, stroke: 0.3pt))
+      ]
     },
   )
 
