@@ -1,9 +1,9 @@
 // brief.typ — DIN 5008 letter (Geschäftsbrief). Default Form B.
 //
-// SCAFFOLD geometry: the millimetre values below come from the DIN 5008 research
-// (secondary sources: din-5008-richtlinien.de, federwerk.de, KOMA DIN5008A.lco)
-// and must be spot-checked against the official standard and validated with
-// `typst compile` + veraPDF before being trusted as authoritative (Roadmap P1).
+// DIN 5008 geometry validated against KOMA-Script source (LPPL):
+//   Form A: KOMA DIN5008A.lco + DINmtext.lco
+//   Form B: KOMA DIN5008B.lco + DIN.lco
+//   Source: https://github.com/KOMA-Script/KOMA-Script
 //
 //   Form A: Briefkopf 27 mm, Anschriftfeld ref 44.7 mm, Infoblock top 32 mm,
 //           Falzmarken 87/192 mm
