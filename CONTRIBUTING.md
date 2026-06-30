@@ -39,3 +39,10 @@ make examples              # renders examples/*.md into dist/
 
 Conventional-commit prefixes (`feat:`, `fix:`, `docs:`, `test:`, `chore:`) keep
 the changelog clean.
+
+## Pull requests
+
+Use **squash merge** when merging a pull request. It keeps `main` history one
+commit per change, regardless of how many fixup commits a PR went through.
+Merge commits and rebase merges are also enabled on this repository for
+flexibility, but squash is the convention.
