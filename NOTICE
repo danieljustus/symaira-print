@@ -1,0 +1,24 @@
+symaira-print (symprint)
+Copyright 2026 Daniel Justus
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+--------------------------------------------------------------------------------
+Runtime engine (not bundled, reached over PATH)
+--------------------------------------------------------------------------------
+
+symprint shells out to the Typst typesetting engine. Typst is NOT distributed
+with this software; users install it themselves. Typst is licensed under the
+Apache License 2.0 — https://github.com/typst/typst
+
+On first render the Typst engine fetches the following Typst Universe package
+into its own package cache (network required once; Phase 2 will vendor it):
+
+  @preview/cmarker  — CommonMark → Typst, MIT — https://github.com/SabrinaJewson/cmarker.typ
+
+The DIN 5008 letter geometry is informed by these open-source templates
+(consulted as references; see docs/architecture.md):
+
+  Sematre/typst-letter-pro            — MIT
+  pascal-huber/typst-letter-template  — MIT
+  classy-german-invoice               — MIT-0

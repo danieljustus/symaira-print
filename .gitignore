@@ -1,0 +1,19 @@
+# Build outputs
+/symprint
+dist/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Go
+*.test
+*.out
+vendor/
+
+# Config / secrets
+.env
+*.local
+
+# Rendered example PDFs
+examples/*.pdf

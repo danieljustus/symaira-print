@@ -1,0 +1,119 @@
+package press
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestSplit(t *testing.T) {
+	tests := []struct {
+		name     string
+		src      string
+		wantFM   bool
+		wantBody string
+	}{
+		{"with frontmatter", "---\nprofile: report\n---\nhello\n", true, "hello\n"},
+		{"closing dots", "---\nprofile: report\n...\nbody", true, "body"},
+		{"no frontmatter", "# just markdown\n", false, "# just markdown\n"},
+		{"crlf normalized", "---\r\nprofile: report\r\n---\r\nbody\r\n", true, "body\n"},
+		{"unterminated is body", "---\nprofile: report\nno close", false, "---\nprofile: report\nno close"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fm, body := Split([]byte(tt.src))
+			if (len(fm) > 0) != tt.wantFM {
+				t.Errorf("fm presence = %v, want %v (fm=%q)", len(fm) > 0, tt.wantFM, fm)
+			}
+			if string(body) != tt.wantBody {
+				t.Errorf("body = %q, want %q", body, tt.wantBody)
+			}
+		})
+	}
+}
+
+func TestParseRejectsUnknownKey(t *testing.T) {
+	_, err := Parse([]byte("---\nprofile: report\ntitle: X\nunknown_key: 1\n---\nbody\n"))
+	if err == nil {
+		t.Fatal("expected error for unknown frontmatter key")
+	}
+	ce, ok := err.(*ContractError)
+	if !ok {
+		t.Fatalf("want *ContractError, got %T", err)
+	}
+	if !strings.Contains(ce.Error(), "unknown_key") {
+		t.Errorf("error should name the offending key: %v", ce)
+	}
+}
+
+func TestParseAuthorScalarOrList(t *testing.T) {
+	scalar, err := Parse([]byte("---\nauthor: Jane\n---\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scalar.Front.Author) != 1 || scalar.Front.Author[0] != "Jane" {
+		t.Errorf("scalar author = %v", scalar.Front.Author)
+	}
+	list, err := Parse([]byte("---\nauthor: [Jane, John]\n---\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Front.Author) != 2 {
+		t.Errorf("list author = %v", list.Front.Author)
+	}
+}
+
+func TestValidate(t *testing.T) {
+	behoerde, _ := Lookup("behoerde")
+
+	good := mustParse(t, "---\nprofile: behoerde\nlang: de\ntitle: T\ndate: 30.06.2026\nrecipient:\n  name: R\n---\n")
+	if issues := good.Validate(behoerde); hasErrors(issues) {
+		t.Errorf("valid doc reported errors: %v", issues)
+	}
+
+	bad := mustParse(t, "---\nprofile: behoerde\ndate: 30/06/2026\n---\n")
+	issues := bad.Validate(behoerde)
+	if !hasErrors(issues) {
+		t.Fatal("expected validation errors")
+	}
+	got := fields(issues)
+	for _, want := range []string{"recipient", "title", "lang", "date"} {
+		if !got[want] {
+			t.Errorf("missing expected issue for %q (got %v)", want, got)
+		}
+	}
+}
+
+func TestValidateDateFormats(t *testing.T) {
+	report, _ := Lookup("report")
+	for _, d := range []string{"30.06.2026", "2026-06-30"} {
+		doc := mustParse(t, "---\nprofile: report\ntitle: T\ndate: "+d+"\n---\n")
+		if hasErrors(doc.Validate(report)) {
+			t.Errorf("date %q should be valid", d)
+		}
+	}
+	for _, d := range []string{"2026/06/30", "1.1.2026", "30-06-2026"} {
+		doc := mustParse(t, "---\nprofile: report\ntitle: T\ndate: "+d+"\n---\n")
+		if !hasErrors(doc.Validate(report)) {
+			t.Errorf("date %q should be invalid", d)
+		}
+	}
+}
+
+func mustParse(t *testing.T, src string) *Document {
+	t.Helper()
+	doc, err := Parse([]byte(src))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	return doc
+}
+
+func fields(issues []Issue) map[string]bool {
+	m := map[string]bool{}
+	for _, is := range issues {
+		if is.Severity == "error" {
+			m[is.Field] = true
+		}
+	}
+	return m
+}
