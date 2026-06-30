@@ -62,9 +62,9 @@ func TestCleanTypstError(t *testing.T) {
 			strings.Repeat("line\n", 40) + "  … (truncated)",
 		},
 		{
-			name:     "exactly 40 lines",
-			in:       strings.Repeat("line\n", 40),
-			want:     strings.Repeat("line\n", 39) + "line", // function strips trailing \n
+			name: "exactly 40 lines",
+			in:   strings.Repeat("line\n", 40),
+			want: strings.Repeat("line\n", 39) + "line", // function strips trailing \n
 		},
 	}
 	for _, tt := range tests {
@@ -81,7 +81,7 @@ func TestRenderNoProfile(t *testing.T) {
 	// Document with no profile in frontmatter and no override/default
 	src := []byte("---\ntitle: Test\n---\nHello\n")
 	req := Request{
-		Source:    src,
+		Source:     src,
 		OutputPath: filepath.Join(t.TempDir(), "out.pdf"),
 	}
 	_, err := Render(context.Background(), req)
@@ -100,7 +100,7 @@ func TestRenderNoProfile(t *testing.T) {
 func TestRenderUnknownProfile(t *testing.T) {
 	src := []byte("---\nprofile: nonexistent\n---\nHello\n")
 	req := Request{
-		Source:    src,
+		Source:     src,
 		OutputPath: filepath.Join(t.TempDir(), "out.pdf"),
 	}
 	_, err := Render(context.Background(), req)
@@ -120,8 +120,8 @@ func TestRenderProfileOverride(t *testing.T) {
 	// Override to report (needs only title) while frontmatter has behoerde (needs recipient+title+lang)
 	src := []byte("---\nprofile: behoerde\ntitle: Test\n---\nHello\n")
 	req := Request{
-		Source:         src,
-		OutputPath:     filepath.Join(t.TempDir(), "out.pdf"),
+		Source:          src,
+		OutputPath:      filepath.Join(t.TempDir(), "out.pdf"),
 		ProfileOverride: "report",
 	}
 	_, err := Render(context.Background(), req)
@@ -163,7 +163,7 @@ func TestRenderValidationFails(t *testing.T) {
 	// behoerde requires recipient, title, lang, date
 	src := []byte("---\nprofile: behoerde\n---\nHello\n")
 	req := Request{
-		Source:    src,
+		Source:     src,
 		OutputPath: filepath.Join(t.TempDir(), "out.pdf"),
 	}
 	_, err := Render(context.Background(), req)
@@ -185,7 +185,8 @@ func mockTypst(t *testing.T, dir string, succeed bool) string {
 	script := filepath.Join(dir, "typst")
 	content := "#!/bin/sh\n"
 	if succeed {
-		content += "> \"$5\"\n" // create the output file (5th arg)
+		// The output file is the last argument.
+		content += "> \"${!#}\"\n" // create the output file (last arg)
 	} else {
 		content += "echo 'error: test error' >&2\nexit 1\n"
 	}
@@ -288,7 +289,7 @@ func TestRenderTypstFontArgs(t *testing.T) {
 	// Create mock typst that captures args
 	binDir := t.TempDir()
 	argCapture := filepath.Join(binDir, "args.txt")
-	script := "#!/bin/sh\necho \"$@\" > " + argCapture + "\n> \"$5\"\n"
+	script := "#!/bin/sh\necho \"$@\" > " + argCapture + "\n> \"${!#}\"\n"
 	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -427,9 +428,9 @@ func TestRenderIntegration(t *testing.T) {
 
 	src := []byte("---\nprofile: report\ntitle: Test\ndate: 30.06.2026\n---\n# Hello World\n")
 	req := Request{
-		Source:         src,
-		OutputPath:     filepath.Join(t.TempDir(), "out.pdf"),
-		Reproducible:   boolPtr(true),
+		Source:       src,
+		OutputPath:   filepath.Join(t.TempDir(), "out.pdf"),
+		Reproducible: boolPtr(true),
 		Engine: EngineConfig{
 			TypstBin: filepath.Join(binDir, "typst"),
 			Timeout:  10 * time.Second,

@@ -18,6 +18,7 @@ func newRenderCmd() *cobra.Command {
 		output       string
 		profile      string
 		standard     string
+		fontPath     string
 		reproducible bool
 		reproSet     bool
 	)
@@ -60,6 +61,10 @@ Examples:
 				DefaultProfile:  cfg.Defaults.Profile,
 				Engine:          engineFromConfig(cfg),
 			}
+
+			if fontPath != "" {
+				req.Engine.FontPaths = append(req.Engine.FontPaths, fontPath)
+			}
 			if standard != "" {
 				req.StandardOverride = splitCSV(standard)
 			}
@@ -88,6 +93,7 @@ Examples:
 	cmd.Flags().StringVarP(&output, "output", "o", "", "output PDF path (default: input with .pdf)")
 	cmd.Flags().StringVarP(&profile, "profile", "p", "", "profile to use (overrides frontmatter)")
 	cmd.Flags().StringVar(&standard, "pdf-standard", "", "comma-separated typst --pdf-standard (e.g. a-2a,ua-1)")
+	cmd.Flags().StringVar(&fontPath, "font-path", "", "extra font directory (typst --font-path); embedded fonts always included")
 	cmd.Flags().BoolVar(&reproducible, "reproducible", false, "export SOURCE_DATE_EPOCH for byte-stable output")
 	cmd.PreRun = func(cmd *cobra.Command, _ []string) {
 		reproSet = cmd.Flags().Changed("reproducible")

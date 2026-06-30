@@ -31,8 +31,8 @@ type typstJob struct {
 	timeout      time.Duration
 }
 
-// renderTypst materializes the work dir (templates + meta.json + body.md +
-// main.typ) and runs `typst compile`, capturing stderr separately so a failure
+// renderTypst materializes the work dir (templates + fonts + meta.json + body.md
+// + main.typ) and runs `typst compile`, capturing stderr separately so a failure
 // yields the engine's real diagnostic instead of a swallowed exit code.
 func renderTypst(ctx context.Context, eng EngineInfo, job typstJob) (*Result, error) {
 	start := time.Now()
@@ -46,6 +46,11 @@ func renderTypst(ctx context.Context, eng EngineInfo, job typstJob) (*Result, er
 	tplDir := filepath.Join(work, "templates")
 	if err := assets.Materialize(tplDir); err != nil {
 		return nil, &RenderError{Stage: "write", Message: "could not materialize templates", Err: err}
+	}
+
+	fontDir := filepath.Join(work, "fonts")
+	if _, err := assets.MaterializeFonts(fontDir); err != nil {
+		return nil, &RenderError{Stage: "write", Message: "could not materialize fonts", Err: err}
 	}
 
 	metaJSON, err := json.MarshalIndent(job.front, "", "  ")
@@ -71,11 +76,20 @@ func renderTypst(ctx context.Context, eng EngineInfo, job typstJob) (*Result, er
 	}
 
 	args := []string{"compile", "--root", work}
-	if job.ignoreFonts {
-		args = append(args, "--ignore-system-fonts")
-	}
+
+	// Always include the embedded font directory for machine-independent output.
+	args = append(args, "--font-path", fontDir)
+
+	// Add user-specified font paths after the embedded dir (user paths take
+	// priority when font names collide).
 	for _, fp := range job.fontPaths {
 		args = append(args, "--font-path", fp)
+	}
+
+	// When embedded fonts are available, ignore system fonts by default for
+	// deterministic output. Users can override via --ignore-system-fonts=false.
+	if job.ignoreFonts || len(job.fontPaths) == 0 {
+		args = append(args, "--ignore-system-fonts")
 	}
 	if len(job.pdfStandard) > 0 {
 		args = append(args, "--pdf-standard", strings.Join(job.pdfStandard, ","))

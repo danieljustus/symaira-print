@@ -22,3 +22,19 @@ The DIN 5008 letter geometry is informed by these open-source templates
   Sematre/typst-letter-pro            — MIT
   pascal-huber/typst-letter-template  — MIT
   classy-german-invoice               — MIT-0
+
+--------------------------------------------------------------------------------
+Embedded fonts (bundled in binary)
+--------------------------------------------------------------------------------
+
+symprint embeds the following font for machine-independent rendering. The font
+is used for DIN sub-10pt text and body copy. System fonts are ignored by default
+when embedded fonts are available (pass --ignore-system-fonts=false to override).
+
+  Inter — https://github.com/rsms/inter
+  Version: 4.1
+  License: SIL Open Font License 1.1 (OFL-1.1) — https://scripts.sil.org/OFL
+  Files: Inter-Regular.ttf, Inter-Bold.ttf
+
+The full SIL OFL 1.1 license text is included in internal/assets/fonts/INTER-LICENSE.txt
+and embedded in the binary.

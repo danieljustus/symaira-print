@@ -142,5 +142,3 @@ func mustParse(t *testing.T, src string) *Document {
 	}
 	return doc
 }
-
-
