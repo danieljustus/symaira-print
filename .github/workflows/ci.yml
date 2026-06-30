@@ -81,3 +81,15 @@ jobs:
           ./symprint render examples/behoerde.md -o /tmp/behoerde.pdf
           ./symprint render examples/brief.md    -o /tmp/brief.pdf
           file /tmp/*.pdf
+
+      - name: Validate PDF/A-2a (veraPDF)
+        run: |
+          docker run --rm -v "/tmp:/data" verapdf/cli \
+            -f 2a --format text /data/behoerde.pdf \
+            | grep -q 'isCompliant="true"'
+
+      - name: Validate PDF/UA-1 (veraPDF)
+        run: |
+          docker run --rm -v "/tmp:/data" verapdf/cli \
+            -f ua1 --format text /data/behoerde.pdf \
+            | grep -q 'isCompliant="true"'

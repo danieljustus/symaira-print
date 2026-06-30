@@ -220,8 +220,9 @@ test. End-to-end render of all four profiles verified.
 
 ### Phase 1 — Compliance hardening (Behörde-grade)
 - Validate DIN 5008 geometry against the standard + KOMA `DIN5008A.lco`; lock the
-  millimetre constants; promote `brief`/`behoerde` from *scaffold* to *beta*.
-- Wire **veraPDF** into CI as a gate for `behoerde` (assert PDF/A-2a + PDF/UA-1).
+  millimetre constants; promote `brief`/`behoerde` from *scaffold* to *beta*. ✅
+- Wire **veraPDF** into CI as a gate for `behoerde` (assert PDF/A-2a + PDF/UA-1). ✅
+  Uses `verapdf/cli` Docker image; validates both profiles on every push/PR.
 - Accessibility completeness: propagate Markdown image alt text to `image(alt:)`,
   map Markdown tables to `table.header`, wrap fold/hole marks in `pdf.artifact()`,
   ensure logical reading order and metadata title.
