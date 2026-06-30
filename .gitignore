@@ -17,3 +17,6 @@ vendor/
 
 # Rendered example PDFs
 examples/*.pdf
+
+# Local agent tooling state
+.omo/
