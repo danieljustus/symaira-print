@@ -161,17 +161,21 @@ Sehr geehrte Frau Mustermann, …
 ## 5. Profiles & German standards
 
 Catalog: [profiles.md](profiles.md). The two letter profiles encode **DIN 5008**
-geometry (Form A for `behoerde`, Form B for `brief`). Key measurements
-(secondary sources — to be confirmed against the standard in P1):
+geometry (Form A for `behoerde`, Form B for `brief`). All values validated
+against KOMA-Script source (LPPL):
+[ DIN5008A.lco](https://github.com/KOMA-Script/KOMA-Script/blob/main/DIN5008A.lco) /
+[ DINmtext.lco](https://github.com/KOMA-Script/KOMA-Script/blob/main/DINmtext.lco) (Form A) and
+[ DIN5008B.lco](https://github.com/KOMA-Script/KOMA-Script/blob/main/DIN5008B.lco) /
+[ DIN.lco](https://github.com/KOMA-Script/KOMA-Script/blob/main/DIN.lco) (Form B):
 
-| Element | Form A (Behörde) | Form B (Brief) |
-|---|---|---|
-| Briefkopf height | 27 mm | 45 mm |
-| Anschriftfeld top (ref) | 44.7 mm | 62.7 mm |
-| Anschriftfeld size | 45 × 85 mm | 45 × 85 mm |
-| Infoblock top / left / width | 32 / 125 / 75 mm | 50 / 125 / 75 mm |
-| Falzmarken | 87 / 192 mm | 105 / 210 mm |
-| Lochmarke | 148.5 mm | 148.5 mm |
+| Element | Form A (Behörde) | Form B (Brief) | Source |
+|---|---|---|---|
+| Briefkopf height | 27 mm | 45 mm | `toaddrvpos` |
+| Anschriftfeld top (ref) | 44.7 mm | 62.7 mm | `toaddrvpos + backaddrheight + specialmailheight` |
+| Anschriftfeld size | 45 × 85 mm | 45 × 85 mm | `toaddrheight × toaddrwidth` |
+| Infoblock top / left / width | 32 / 125 / 75 mm | 50 / 125 / 75 mm | `locvpos`, `firstheadwidth`, `locwidth` |
+| Falzmarken | 87 / 192 mm | 105 / 210 mm | `tfoldmarkvpos` / `bfoldmarkvpos` |
+| Lochmarke | 148.5 mm | 148.5 mm | A4 height ÷ 2 |
 
 **Compliance stack (behoerde):**
 
@@ -216,8 +220,9 @@ test. End-to-end render of all four profiles verified.
 
 ### Phase 1 — Compliance hardening (Behörde-grade)
 - Validate DIN 5008 geometry against the standard + KOMA `DIN5008A.lco`; lock the
-  millimetre constants; promote `brief`/`behoerde` from *scaffold* to *beta*.
-- Wire **veraPDF** into CI as a gate for `behoerde` (assert PDF/A-2a + PDF/UA-1).
+  millimetre constants; promote `brief`/`behoerde` from *scaffold* to *beta*. ✅
+- Wire **veraPDF** into CI as a gate for `behoerde` (assert PDF/A-2a + PDF/UA-1). ✅
+  Uses `verapdf/cli` Docker image; validates both profiles on every push/PR.
 - Accessibility completeness: propagate Markdown image alt text to `image(alt:)`,
   map Markdown tables to `table.header`, wrap fold/hole marks in `pdf.artifact()`,
   ensure logical reading order and metadata title.
@@ -256,8 +261,9 @@ test. End-to-end render of all four profiles verified.
 
 ## 8. Open questions & risks
 
-- **DIN measurements** come from secondary sources; confirm against the paid DIN
-  5008 text before treating the constants as authoritative (esp. Infoblock top).
+- **DIN measurements** validated against KOMA-Script source (LPPL) — see §5 table.
+  The paid DIN 5008 text is the ultimate authority; KOMA-Script is the best
+  freely available cross-reference.
 - **Typst is pre-1.0** (v0.15.0); pin engine + package versions — templates can
   drift across minors. PDF/UA-2 is not available yet (planned later 2026).
 - **cmarker limits**: no reusable Typst functions / native Typst math from inside

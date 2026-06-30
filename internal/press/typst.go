@@ -140,7 +140,9 @@ func mainTyp(template string) string {
 #import "/templates/%s" as profile
 #let meta = json("/meta.json")
 #show: profile.apply.with(meta)
-#cmarker.render(read("/body.md"))
+#cmarker.render(read("/body.md"), scope: (
+  image: (source, ..args) => image(source, ..args),
+))
 `, cmarkerVersion, template)
 }
 

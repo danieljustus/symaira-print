@@ -46,3 +46,21 @@ install:
 examples: build
 	./$(BINARY_NAME) render examples/report.md -o dist/report.pdf
 	./$(BINARY_NAME) render examples/behoerde.md -o dist/behoerde.pdf
+
+# Validate behoerde PDF/A-2a + PDF/UA-1 conformance (requires `verapdf` on PATH
+# or Docker). Usage: make verapdf  or  make verapdf DOCKER=1
+.PHONY: verapdf
+verapdf: examples
+	@echo "==> Validating behoerde.pdf against PDF/A-2a…"
+ifeq ($(DOCKER),1)
+	docker run --rm -v "$(CURDIR):/data" verapdf/cli -f 2a --format text /data/dist/behoerde.pdf | grep -q 'isCompliant="true"'
+else
+	verapdf -f 2a --format text dist/behoerde.pdf | grep -q 'isCompliant="true"'
+endif
+	@echo "==> Validating behoerde.pdf against PDF/UA-1…"
+ifeq ($(DOCKER),1)
+	docker run --rm -v "$(CURDIR):/data" verapdf/cli -f ua1 --format text /data/dist/behoerde.pdf | grep -q 'isCompliant="true"'
+else
+	verapdf -f ua1 --format text dist/behoerde.pdf | grep -q 'isCompliant="true"'
+endif
+	@echo "==> veraPDF: all checks passed."

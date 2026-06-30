@@ -86,3 +86,32 @@ any document without rendering:
 ```bash
 symprint validate mydoc.md
 ```
+
+## Accessibility (PDF/UA)
+
+For `behoerde` profiles (PDF/A-2a + PDF/UA-1), authors are responsible for:
+
+- **Image alt text**: Use `![descriptive alt text](image.png)` syntax. The alt text
+  is propagated to Typst's `image(alt:)` and must be meaningful — describe the
+  image's content or function, not just its appearance. Decorative images should
+  use `alt=""` (empty string).
+
+- **Heading hierarchy**: Start with `# Heading 1` and don't skip levels. PDF/UA
+  requires a logical heading tree — screen readers use it for navigation.
+
+- **Table headers**: Use Markdown table syntax with a header row:
+  ```markdown
+  | Column A | Column B |
+  |----------|----------|
+  | data     | data     |
+  ```
+  The header row is automatically tagged as `<TH>` in the PDF structure tree.
+
+- **Document title and language**: Always set `title` and `lang` in frontmatter.
+  These are required for PDF/UA compliance and appear in PDF metadata.
+
+Validate accessibility gaps with:
+
+```bash
+symprint validate --strict mydoc.md
+```

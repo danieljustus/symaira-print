@@ -47,8 +47,8 @@ end-to-end against Typst 0.15.0:
 
 What is **not** done yet (see [docs/architecture.md](docs/architecture.md)):
 
-- DIN 5008 letter geometry is a first draft — millimetre values come from
-  secondary sources and need validation against the standard + veraPDF.
+- DIN 5008 letter geometry validated against KOMA-Script (LPPL); veraPDF CI
+  gating pending.
 - Brand fonts, `veraPDF` CI gating, the `rechnung` VAT/GiroCode logic, and the
   pandoc/WeasyPrint fallback paths are roadmap items.
 
