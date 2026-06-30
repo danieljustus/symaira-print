@@ -143,12 +143,4 @@ func mustParse(t *testing.T, src string) *Document {
 	return doc
 }
 
-func fields(issues []Issue) map[string]bool {
-	m := map[string]bool{}
-	for _, is := range issues {
-		if is.Severity == "error" {
-			m[is.Field] = true
-		}
-	}
-	return m
-}
+
