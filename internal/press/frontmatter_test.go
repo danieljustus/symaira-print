@@ -75,10 +75,31 @@ func TestValidate(t *testing.T) {
 	if !hasErrors(issues) {
 		t.Fatal("expected validation errors")
 	}
-	got := fields(issues)
-	for _, want := range []string{"recipient", "title", "lang", "date"} {
-		if !got[want] {
-			t.Errorf("missing expected issue for %q (got %v)", want, got)
+
+	// Verify exact error messages for each required field
+	expectedMsgs := map[string][]string{
+		"recipient": {`profile "behoerde" requires "recipient"`},
+		"title":     {`profile "behoerde" requires "title"`, `PDF/UA requires a document title in metadata`},
+		"lang":      {`profile "behoerde" requires "lang"`, `PDF/UA requires a document language (e.g. lang: de)`},
+		"date":      {`must be TT.MM.JJJJ or JJJJ-MM-TT with leading zeros (DIN 5008)`},
+	}
+	for _, issue := range issues {
+		if issue.Severity != "error" {
+			continue
+		}
+		wantMsgs, ok := expectedMsgs[issue.Field]
+		if !ok {
+			continue
+		}
+		found := false
+		for _, wantMsg := range wantMsgs {
+			if issue.Message == wantMsg {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("field %q: got unexpected message %q", issue.Field, issue.Message)
 		}
 	}
 }
@@ -91,10 +112,24 @@ func TestValidateDateFormats(t *testing.T) {
 			t.Errorf("date %q should be valid", d)
 		}
 	}
-	for _, d := range []string{"2026/06/30", "1.1.2026", "30-06-2026"} {
-		doc := mustParse(t, "---\nprofile: report\ntitle: T\ndate: "+d+"\n---\n")
-		if !hasErrors(doc.Validate(report)) {
-			t.Errorf("date %q should be invalid", d)
+	for _, tt := range []struct {
+		date    string
+		wantMsg string
+	}{
+		{"2026/06/30", `must be TT.MM.JJJJ or JJJJ-MM-TT with leading zeros (DIN 5008)`},
+		{"1.1.2026", `must be TT.MM.JJJJ or JJJJ-MM-TT with leading zeros (DIN 5008)`},
+		{"30-06-2026", `must be TT.MM.JJJJ or JJJJ-MM-TT with leading zeros (DIN 5008)`},
+	} {
+		doc := mustParse(t, "---\nprofile: report\ntitle: T\ndate: "+tt.date+"\n---\n")
+		issues := doc.Validate(report)
+		if !hasErrors(issues) {
+			t.Errorf("date %q should be invalid", tt.date)
+			continue
+		}
+		for _, issue := range issues {
+			if issue.Field == "date" && issue.Message != tt.wantMsg {
+				t.Errorf("date %q: got message %q, want %q", tt.date, issue.Message, tt.wantMsg)
+			}
 		}
 	}
 }
