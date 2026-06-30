@@ -86,10 +86,10 @@ jobs:
         run: |
           docker run --rm -v "/tmp:/data" verapdf/cli \
             -f 2a --format text /data/behoerde.pdf \
-            | grep -q 'isCompliant="true"'
+            | grep -q '^PASS'
 
       - name: Validate PDF/UA-1 (veraPDF)
         run: |
           docker run --rm -v "/tmp:/data" verapdf/cli \
             -f ua1 --format text /data/behoerde.pdf \
-            | grep -q 'isCompliant="true"'
+            | grep -q '^PASS'
