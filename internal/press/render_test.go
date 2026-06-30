@@ -185,8 +185,9 @@ func mockTypst(t *testing.T, dir string, succeed bool) string {
 	script := filepath.Join(dir, "typst")
 	content := "#!/bin/sh\n"
 	if succeed {
-		// The output file is the last argument.
-		content += "> \"${!#}\"\n" // create the output file (last arg)
+		// The output file is the last argument; eval is POSIX sh portable
+		// (unlike bash's ${!#}, which dash on CI runners doesn't support).
+		content += "eval out=\\${$#}; > \"$out\"\n"
 	} else {
 		content += "echo 'error: test error' >&2\nexit 1\n"
 	}
@@ -289,7 +290,7 @@ func TestRenderTypstFontArgs(t *testing.T) {
 	// Create mock typst that captures args
 	binDir := t.TempDir()
 	argCapture := filepath.Join(binDir, "args.txt")
-	script := "#!/bin/sh\necho \"$@\" > " + argCapture + "\n> \"${!#}\"\n"
+	script := "#!/bin/sh\necho \"$@\" > " + argCapture + "\neval out=\\${$#}; > \"$out\"\n"
 	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
