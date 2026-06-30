@@ -14,6 +14,19 @@ ecosystem.
 > owns every visual decision (colours, heading sizes, cover page, page numbers,
 > DIN 5008 geometry, PDF/A + PDF/UA). What you write is what you get.
 
+```
+$ symprint render brief.md
+✓ brief.pdf
+  profile brief · engine typst 0.15.0 · PDF (tagged) · 42.3 kB · 180 ms
+
+$ symprint render anhoerung.md -p behoerde
+✓ anhoerung.pdf
+  profile behoerde · engine typst 0.15.0 · PDF/A-2A+UA-1 · 38.7 kB · 195 ms
+
+$ symprint validate report.md
+✓ valid for profile "report"
+```
+
 ## Why symprint
 
 - **Profiles, not knobs.** Pick `brief`, `behoerde`, `report`, or `rechnung`.
