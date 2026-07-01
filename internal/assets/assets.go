@@ -17,25 +17,6 @@ var fsys embed.FS
 //go:embed fonts/*.ttf fonts/*.txt
 var fontFS embed.FS
 
-// FS exposes the embedded template tree (rooted so "templates/report.typ"
-// resolves) for callers that want to read templates directly.
-func FS() embed.FS { return fsys }
-
-// TemplateNames returns the embedded template file names (e.g. "report.typ").
-func TemplateNames() ([]string, error) {
-	entries, err := fsys.ReadDir("templates")
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() {
-			names = append(names, e.Name())
-		}
-	}
-	return names, nil
-}
-
 // Materialize writes every embedded template into dir as real files so typst
 // can import them (typst resolves imports from the filesystem, not embed.FS).
 func Materialize(dir string) error {
