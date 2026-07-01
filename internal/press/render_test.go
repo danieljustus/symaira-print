@@ -382,9 +382,13 @@ func TestRenderTypstReproducibleEnv(t *testing.T) {
 }
 
 func TestRenderTypstTimeout(t *testing.T) {
-	// Create mock typst that sleeps forever
+	// Create mock typst that sleeps forever. `exec` replaces the shell
+	// process with sleep itself, so the SIGKILL renderTypst sends on context
+	// deadline terminates the process actually holding the stderr pipe open
+	// — without it, sleep runs as an orphaned grandchild of the killed shell
+	// and cmd.Wait() blocks for the full 5s WaitDelay before forcing cleanup.
 	binDir := t.TempDir()
-	script := "#!/bin/sh\nsleep 100\n"
+	script := "#!/bin/sh\nexec sleep 100\n"
 	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
