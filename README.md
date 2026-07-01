@@ -52,7 +52,7 @@ $ symprint validate report.md
 
 ## Status
 
-This is an early **scaffold** (v0.1.0-dev). What works today, verified
+This is an early **scaffold** (v0.1.0). What works today, verified
 end-to-end against Typst 0.15.0:
 
 - The full Go pipeline: strict frontmatter contract, profile registry,
@@ -62,13 +62,14 @@ end-to-end against Typst 0.15.0:
 - All four profiles render. `report` produces cover + TOC + headers + page
   numbers; `behoerde` produces a verified **PDF/A-2a + PDF/UA-1** file
   (`pdfaid` + `pdfuaid` + `StructTreeRoot` present).
+- DIN 5008 letter geometry validated against KOMA-Script (LPPL) source values.
+- `veraPDF` CI gating validates PDF/A-2a + PDF/UA-1 conformance on every push/PR.
+- Brand fonts (Inter) embedded via `go:embed` for machine-independent output.
 
 What is **not** done yet (see [docs/architecture.md](docs/architecture.md)):
 
-- DIN 5008 letter geometry validated against KOMA-Script (LPPL); veraPDF CI
-  gating pending.
-- Brand fonts, `veraPDF` CI gating, the `rechnung` VAT/GiroCode logic, and the
-  pandoc/WeasyPrint fallback paths are roadmap items.
+- The `rechnung` VAT/GiroCode logic (currently a scaffold).
+- More profiles, and the pandoc/WeasyPrint fallback paths, are roadmap items.
 
 ## Install
 

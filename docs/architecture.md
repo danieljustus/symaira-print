@@ -230,7 +230,7 @@ test. End-to-end render of all four profiles verified.
 
 ### Phase 2 — Determinism & offline
 - Embed brand fonts via `go:embed`; pass `--font-path` + `--ignore-system-fonts`
-  for machine-independent output; ship a sans face for DIN sub-10pt text.
+  for machine-independent output; ship a sans face for DIN sub-10pt text. ✅
 - **Vendor the `cmarker` (and `mitex`) packages** into the Typst package cache so
   the first render needs no network → fully standalone.
 - Pin the Typst version and hash-test sample outputs in CI.
