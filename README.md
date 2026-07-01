@@ -14,6 +14,11 @@ ecosystem.
 > owns every visual decision (colours, heading sizes, cover page, page numbers,
 > DIN 5008 geometry, PDF/A + PDF/UA). What you write is what you get.
 
+<img src="docs/assets/sample-behoerde.png" alt="Sample PDF/A-2a + PDF/UA-1 letter rendered with the behoerde profile from examples/behoerde.md" width="420">
+
+*Output of `symprint render examples/behoerde.md -o anhoerung.pdf` — DIN 5008
+layout, PDF/A-2a + PDF/UA-1, rendered with the `behoerde` profile.*
+
 ```
 $ symprint render brief.md
 ✓ brief.pdf
