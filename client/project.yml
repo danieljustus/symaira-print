@@ -1,0 +1,52 @@
+name: Symprint
+options:
+  bundleIdPrefix: dev.symaira
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: false
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Symprint:
+    type: application
+    platform: macOS
+    deploymentTarget:
+      macOS: "14.0"
+    sources:
+      - path: Sources/SymprintApp
+        excludes:
+          - "**/*.xcassets"
+    entitlements:
+      path: Symprint.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.symaira.Symprint
+        INFOPLIST_FILE: Sources/SymprintApp/Info.plist
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        ENABLE_HARDENED_RUNTIME: true
+        COMBINE_HIDPI_IMAGES: true
+    postBuildScripts:
+      - name: Embed symprint Engine
+        script: |
+          # Copy the pre-built symprint binary into Contents/Resources.
+          # Build it first: cd .. && make build
+          SRC="${PROJECT_DIR}/../symprint"
+          DST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources"
+          if [ -f "$SRC" ]; then
+            mkdir -p "$DST"
+            cp "$SRC" "$DST/symprint"
+            chmod +x "$DST/symprint"
+            echo "Embedded symprint binary into $DST/symprint"
+          else
+            echo "warning: symprint binary not found at $SRC — run 'make build' first"
+          fi
+        runOnlyWhenInstalling: false
+        basedOnDependencyAnalysis: false

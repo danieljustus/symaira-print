@@ -35,3 +35,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  release-client:
+    needs: [goreleaser]
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: '1.26.4'
+
+      - name: Install Build Tools
+        run: brew install xcodegen create-dmg
+
+      - name: Build Go Engine
+        run: make build
+
+      - name: Generate Xcode Project
+        run: make client-gen
+
+      - name: Build macOS App
+        run: make client-build
+
+      - name: Package DMG Installer
+        run: make client-dmg
+
+      - name: Upload DMG to Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF##*/}"
+          echo "Uploading dist/Symprint.dmg to release $TAG_NAME..."
+          gh release upload "$TAG_NAME" dist/Symprint.dmg --clobber
+

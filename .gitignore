@@ -20,3 +20,8 @@ examples/*.pdf
 
 # Local agent tooling state
 .omo/
+
+# Xcode & client build outputs
+client/build/
+client/*.xcodeproj
+
