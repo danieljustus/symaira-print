@@ -1,85 +1,56 @@
 import Foundation
 import Observation
+import SymairaCLIRunner
+import SymairaToolKit
 
 @Observable
 @MainActor
 class CliManager {
     static let shared = CliManager()
-    
+
     private(set) var isExecuting = false
     private(set) var logs: [String] = []
-    
+
+    // Large documents can render for minutes; keep the timeout generous.
+    private let runner = CLIRunner(defaultTimeout: 300)
+    private let locator: BinaryLocator = {
+        // Repo root (../symprint) as last resort keeps the pre-AppKit dev
+        // workflow working when running from Xcode without a bundled binary.
+        let projectRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent() // Services/
+            .deletingLastPathComponent() // SymprintApp/
+            .deletingLastPathComponent() // Sources/
+            .deletingLastPathComponent() // client/
+            .deletingLastPathComponent() // repo root
+        return BinaryLocator(extraDirectories: ["/opt/homebrew/bin", "/usr/local/bin", projectRoot.path])
+    }()
+
     private func appendLog(_ text: String) {
         logs.append(text)
         if logs.count > 1000 {
             logs.removeFirst(logs.count - 1000)
         }
     }
-    
+
     func clearLogs() {
         logs.removeAll()
     }
-    
+
     private func locateBinary() -> URL? {
-        if let bundleURL = Bundle.main.url(forResource: "symprint", withExtension: nil) {
-            return bundleURL
-        }
-        
-        // Dev fallbacks (outside app bundle, for simulator/test runs)
-        let bundleDir = Bundle.main.bundleURL.deletingLastPathComponent()
-        let devBinary = bundleDir.appendingPathComponent("symprint")
-        if FileManager.default.fileExists(atPath: devBinary.path) {
-            return devBinary
-        }
-        
-        let projectRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent() // Services/
-            .deletingLastPathComponent() // SymprintApp/
-            .deletingLastPathComponent() // Sources/
-            .deletingLastPathComponent() // client/
-        let projectBinary = projectRoot.appendingPathComponent("symprint")
-        if FileManager.default.fileExists(atPath: projectBinary.path) {
-            return projectBinary
-        }
-        
-        return nil
+        locator.locate("symprint")?.url
     }
-    
+
     func executeCommand(arguments: [String]) async throws -> (stdout: String, stderr: String, exitCode: Int32) {
         guard let binaryURL = locateBinary() else {
-            throw NSError(domain: "CliManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "symprint binary not found. Please build the Go binary first ('make build')."])
+            throw NSError(domain: "CliManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "symprint binary not found. Install it via 'brew install danieljustus/tap/symprint' or build it first ('make build')."])
         }
-        
-        let process = Process()
-        process.executableURL = binaryURL
-        process.arguments = arguments
-        
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        
-        // Inherit path and inject common brew and system binary locations
-        var env = ProcessInfo.processInfo.environment
-        if let path = env["PATH"] {
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:\(path)"
-        } else {
-            env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
-        }
-        process.environment = env
-        
-        try process.run()
-        
-        // Safely retrieve outputs
-        let stdoutData = (try? stdoutPipe.fileHandleForReading.readToEnd()) ?? Data()
-        let stderrData = (try? stderrPipe.fileHandleForReading.readToEnd()) ?? Data()
-        
-        process.waitUntilExit()
-        
-        let stdoutStr = String(data: stdoutData, encoding: .utf8) ?? ""
-        let stderrStr = String(data: stderrData, encoding: .utf8) ?? ""
-        
-        return (stdoutStr, stderrStr, process.terminationStatus)
+
+        let result = try await runner.run(binaryURL, arguments: arguments)
+        return (
+            String(data: result.stdout, encoding: .utf8) ?? "",
+            String(data: result.stderr, encoding: .utf8) ?? "",
+            result.exitCode
+        )
     }
     
     // MARK: - API commands

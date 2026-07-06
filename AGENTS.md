@@ -64,3 +64,16 @@ test** that compiles `examples/*.md` with a real Typst. Keep them green.
 - Don't bundle the Typst binary into the repo; depend on it via Homebrew /
   install hint.
 - Don't commit secrets or real personal data in `examples/` or tests.
+
+## macOS Client (`client/`)
+
+- SwiftUI app (XcodeGen: `cd client && xcodegen generate`, then build the
+  `Symprint` scheme; local builds need `DEVELOPER_DIR` pointing at Xcode).
+- Depends on the shared **symaira-appkit** package, pinned exact in
+  `client/project.yml` (`SymairaAppKit`, currently `0.1.0`): SymairaTheme
+  (design tokens; local `ThemeBridge.swift` maps legacy names and keeps the
+  print-specific `BlueprintBackground`), SymairaCLIRunner + SymairaToolKit
+  (binary discovery + subprocess execution in `Services/CliManager.swift`).
+- Do not reintroduce app-local Theme/Process-runner code; extend
+  symaira-appkit instead. Migration context: see
+  `../docs/symaira-appkit-migration.md` (Welle 1).
