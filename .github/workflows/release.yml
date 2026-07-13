@@ -26,12 +26,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          # The Homebrew tap publish step needs a separate cross-repo token
-          # (HOMEBREW_TAP_GITHUB_TOKEN) that is not yet configured for this
-          # repository, so it is skipped here; binaries and the GitHub release
-          # itself do not depend on it. Drop --skip=homebrew once the token
-          # is added as a repository secret.
-          args: release --clean --skip=homebrew
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
