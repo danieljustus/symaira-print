@@ -60,6 +60,8 @@ brews:
     repository:
       owner: danieljustus
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
     homepage: "https://github.com/danieljustus/symaira-print"
     description: "Markdown → beautiful PDF via named use-case profiles (Typst engine)"
     license: "Apache-2.0"
