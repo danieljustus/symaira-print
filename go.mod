@@ -3,7 +3,7 @@ module github.com/danieljustus/symaira-print
 go 1.26.4
 
 require (
-	github.com/danieljustus/symaira-corekit v0.3.0
+	github.com/danieljustus/symaira-corekit v0.5.0
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )
