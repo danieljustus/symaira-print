@@ -107,6 +107,18 @@ var builtins = map[string]Profile{
 		RequiredFields: []string{"recipient", "data"},
 		Stability:      StabilityScaffold,
 	},
+	"meeting": {
+		Name:           "meeting",
+		Title:          "Meeting Minutes",
+		Description:    "Accessible and archivable meeting minutes profile. Automatically formats metadata, participants, duration, location, and structured sections (Summary, Decisions, Action Items, Notes, Transcript).",
+		Template:       "meeting.typ",
+		Engine:         "typst",
+		Form:           "",
+		PDFStandard:    []string{"a-2a", "ua-1"},
+		Reproducible:   false,
+		RequiredFields: []string{"title", "lang", "date"},
+		Stability:      StabilityBeta,
+	},
 }
 
 // Lookup returns the built-in profile with the given name.

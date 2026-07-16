@@ -83,6 +83,12 @@ type Frontmatter struct {
 	// Data-driven fields (rechnung and future data profiles)
 	Data map[string]any `yaml:"data" json:"data,omitempty"`
 
+	// Meeting fields (meeting)
+	MeetingID    string     `yaml:"meeting_id" json:"meeting_id,omitempty"`
+	Participants StringList `yaml:"participants" json:"participants,omitempty"`
+	Duration     string     `yaml:"duration" json:"duration,omitempty"`
+	Location     string     `yaml:"location" json:"location,omitempty"`
+
 	// Output
 	PDF PDFOptions `yaml:"pdf" json:"pdf"`
 }
@@ -170,6 +176,8 @@ func (d *Document) fieldEmpty(field string) bool {
 	switch field {
 	case "title":
 		return d.Front.Title == ""
+	case "lang":
+		return d.Front.Lang == ""
 	case "betreff":
 		return d.Front.Betreff == ""
 	case "date":

@@ -15,6 +15,7 @@ symprint profiles behoerde   # detail + capabilities + required fields
 | `behoerde` | scaffold | typst | A | `a-2a`, `ua-1` | `recipient`, `title`, `lang` |
 | `report` | beta | typst | — | — (tagged) | `title` |
 | `rechnung` | scaffold | typst | B | — (tagged) | `recipient`, `data` |
+| `meeting` | beta | typst | — | `a-2a`, `ua-1` | `title`, `lang`, `date` |
 
 *Stability:* `scaffold` = template present, geometry/compliance not yet validated;
 `beta` = working and exercised; `stable` = validated + locked.
@@ -57,6 +58,10 @@ data:
   items:
     - { description: "Beratung (Stunden)", qty: 3, unit_price: 120.0 }
 ```
+
+## meeting — Meeting Minutes + PDF/A + PDF/UA
+
+Turns reviewed SymMeet/SymDesk Markdown documents into polished, accessible (PDF/UA-1), and archivable (PDF/A-2a) meeting minutes. Automatically generates a clean, structured metadata block at the top including the date, meeting ID, duration, and location, as well as a multi-column participant block. Ensures transcript speaker-timestamp lines and action-item checkboxes render elegantly and flow naturally across page breaks. Requires `title`, `lang`, and `date`.
 
 ## Adding a profile
 

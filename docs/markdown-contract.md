@@ -45,6 +45,10 @@ built-in defaults  <  config (~/.config/symprint)  <  profile  <  frontmatter  <
 | `header-left` / `header-right` | string | report | Running-header overrides. |
 | `footer-left` / `footer-right` | string | report | Running-footer overrides. |
 | `data` | map | rechnung | Structured payload (invoice number, items, currency). |
+| `meeting_id` | string | meeting | Identifier for the meeting. |
+| `participants` | list | meeting | List of display strings of meeting participants. |
+| `duration` | string | meeting | Duration of the meeting (e.g. `45m`, `1h 30m`). |
+| `location` | string | meeting | Location of the meeting (e.g. `Room Alpha`, `Discord`). |
 | `pdf.standard` | list | all | typst `--pdf-standard` ids, e.g. `[a-2a, ua-1]`. |
 | `pdf.reproducible` | bool | all | Force byte-stable output for this document. |
 
