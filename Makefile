@@ -50,6 +50,7 @@ install:
 examples: build
 	./$(BINARY_NAME) render examples/report.md -o dist/report.pdf
 	./$(BINARY_NAME) render examples/behoerde.md -o dist/behoerde.pdf
+	./$(BINARY_NAME) render examples/meeting.md -o dist/meeting.pdf
 
 # Validate behoerde PDF/A-2a + PDF/UA-1 conformance (requires `verapdf` on PATH
 # or Docker). Usage: make verapdf  or  make verapdf DOCKER=1

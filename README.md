@@ -34,7 +34,7 @@ $ symprint validate report.md
 
 ## Why symprint
 
-- **Profiles, not knobs.** Pick `brief`, `behoerde`, `report`, or `rechnung`.
+- **Profiles, not knobs.** Pick `brief`, `behoerde`, `report`, `rechnung`, or `meeting`.
   The profile fixes the look; the document stays clean.
 - **One engine, no TeX Live.** Renders with [Typst](https://typst.app) — a
   single Apache-2.0 binary reached over `PATH`. symprint itself stays a single

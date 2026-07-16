@@ -134,6 +134,58 @@ func TestValidateDateFormats(t *testing.T) {
 	}
 }
 
+func TestValidateMeetingProfile(t *testing.T) {
+	meeting, ok := Lookup("meeting")
+	if !ok {
+		t.Fatal("meeting profile not registered")
+	}
+
+	good := mustParse(t, `---
+profile: meeting
+title: "Project Meeting"
+lang: en
+date: 2026-07-16
+meeting_id: "SYM-42"
+participants: ["Daniel", "Antigravity"]
+duration: "1h 30m"
+location: "Online"
+---
+`)
+	if issues := good.Validate(meeting); hasErrors(issues) {
+		t.Errorf("valid meeting doc reported errors: %v", issues)
+	}
+
+	badMissingTitle := mustParse(t, `---
+profile: meeting
+lang: en
+date: 2026-07-16
+---
+`)
+	if issues := badMissingTitle.Validate(meeting); !hasErrors(issues) {
+		t.Error("expected error for missing title in meeting profile")
+	}
+
+	badMissingLang := mustParse(t, `---
+profile: meeting
+title: "Project Meeting"
+date: 2026-07-16
+---
+`)
+	if issues := badMissingLang.Validate(meeting); !hasErrors(issues) {
+		t.Error("expected error for missing lang in meeting profile")
+	}
+
+	badMissingDate := mustParse(t, `---
+profile: meeting
+title: "Project Meeting"
+lang: en
+---
+`)
+	if issues := badMissingDate.Validate(meeting); !hasErrors(issues) {
+		t.Error("expected error for missing date in meeting profile")
+	}
+}
+
 func mustParse(t *testing.T, src string) *Document {
 	t.Helper()
 	doc, err := Parse([]byte(src))

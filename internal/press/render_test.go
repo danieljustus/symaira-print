@@ -568,3 +568,44 @@ func TestTypstVersionShortOutput(t *testing.T) {
 		t.Errorf("expected empty version for short output, got %q", v)
 	}
 }
+
+func TestRenderMeetingSuccess(t *testing.T) {
+	binDir := t.TempDir()
+	mockTypst(t, binDir, true)
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", binDir+":"+origPath)
+	defer os.Setenv("PATH", origPath)
+
+	src := []byte(`---
+profile: meeting
+title: "Project Meeting"
+lang: de
+date: 2026-07-16
+meeting_id: "SYM-42"
+participants: ["Daniel", "Antigravity"]
+duration: "1h 30m"
+location: "Online"
+---
+# Summary
+- Implemented meeting minutes profile.
+`)
+	req := Request{
+		Source:     src,
+		OutputPath: filepath.Join(t.TempDir(), "out.pdf"),
+		Engine: EngineConfig{
+			TypstBin: filepath.Join(binDir, "typst"),
+			Timeout:  10 * time.Second,
+		},
+	}
+
+	result, err := Render(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Render failed for meeting profile: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result")
+	}
+	if result.Profile != "meeting" {
+		t.Errorf("profile = %q, want %q", result.Profile, "meeting")
+	}
+}
