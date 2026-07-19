@@ -1,5 +1,5 @@
 // Command symprint turns Markdown (+ a frontmatter contract) into beautiful PDFs
-// via named use-case profiles (brief, behoerde, report, rechnung), so AI agents,
+// via named use-case profiles (brief, behoerde, report, rechnung, meeting), so AI agents,
 // CLIs and MCP clients get consistent output without the pandoc/LaTeX iteration
 // pain. The typesetting engine (Typst) is reached over PATH, never linked, so
 // symprint stays a single CGO-free binary.
