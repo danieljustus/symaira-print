@@ -51,8 +51,7 @@ func TestLoadConfigOrWarn_StderrWarning(t *testing.T) {
 	}
 
 	cmd := &cobra.Command{Use: "doctor"}
-	var stderr string
-	stderr = captureStderr(t, func() {
+	stderr := captureStderr(t, func() {
 		cfg := loadConfigOrWarn(cmd)
 		if cfg == nil {
 			t.Error("expected config fallback, got nil")
@@ -84,8 +83,7 @@ func TestLoadConfigOrWarn_JSONWarning(t *testing.T) {
 	}
 
 	cmd := &cobra.Command{Use: "doctor"}
-	var stderr string
-	stderr = captureStderr(t, func() {
+	stderr := captureStderr(t, func() {
 		cfg := loadConfigOrWarn(cmd)
 		if cfg == nil {
 			t.Error("expected config fallback, got nil")
@@ -133,8 +131,7 @@ func TestLoadConfigOrWarn_MCPKeepStdoutClean(t *testing.T) {
 	}
 
 	cmd := &cobra.Command{Use: "mcp"}
-	var stderr string
-	stderr = captureStderr(t, func() {
+	stderr := captureStderr(t, func() {
 		cfg := loadConfigOrWarn(cmd)
 		if cfg == nil {
 			t.Error("expected config fallback, got nil")
