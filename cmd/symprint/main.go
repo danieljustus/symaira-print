@@ -104,11 +104,48 @@ func mapPressError(err error) error {
 	return exitcodes.Wrap(err, exitcodes.ExitGeneric, exitcodes.KindInternal, "symprint")
 }
 
+var configWarnings []string
+
+func loadConfigOrWarn(cmd *cobra.Command) *config.Config {
+	cfg, err := config.Load()
+	if err != nil {
+		warnMsg := fmt.Sprintf("warning: config ignored (%s): %v", config.Path(), err)
+		if jsonOut && cmd.Name() != "mcp" {
+			configWarnings = append(configWarnings, warnMsg)
+		} else {
+			fmt.Fprintln(os.Stderr, warnMsg)
+		}
+		return config.Default()
+	}
+	return cfg
+}
+
 func printJSON(v any) error {
-	b, err := json.MarshalIndent(v, "", "  ")
+	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(b))
+
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		fmt.Println(string(b))
+		return nil
+	}
+
+	if m == nil {
+		m = make(map[string]any)
+	}
+
+	w := configWarnings
+	if w == nil {
+		w = []string{}
+	}
+	m["warnings"] = w
+
+	bIndent, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(bIndent))
 	return nil
 }

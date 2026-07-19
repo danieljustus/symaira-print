@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/danieljustus/symaira-corekit/exitcodes"
-	"github.com/danieljustus/symaira-print/internal/config"
 	"github.com/danieljustus/symaira-print/internal/mcp"
 )
 
@@ -15,10 +14,7 @@ func newMCPCmd() *cobra.Command {
 		Long: `Expose symprint over MCP so AI agents can render PDFs, list profiles, and
 validate documents. Transport is stdio JSON-RPC 2.0; all logs go to stderr.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := config.Load()
-			if err != nil {
-				cfg = config.Default()
-			}
+			cfg := loadConfigOrWarn(cmd)
 			mcp.ServerVersion = version
 			if err := mcp.StartServer(cmd.Context(), cfg); err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitGeneric, exitcodes.KindInternal, "mcp server")
