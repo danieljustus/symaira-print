@@ -77,19 +77,21 @@ jobs:
         run: CGO_ENABLED=0 go build -o symprint ./cmd/symprint
       - name: Render examples
         run: |
-          ./symprint render examples/report.md   -o /tmp/report.pdf
-          ./symprint render examples/behoerde.md -o /tmp/behoerde.pdf
-          ./symprint render examples/brief.md    -o /tmp/brief.pdf
+          for name in report behoerde brief meeting rechnung; do
+            ./symprint render "examples/${name}.md" -o "/tmp/${name}.pdf"
+          done
           file /tmp/*.pdf
 
-      - name: Validate PDF/A-2a (veraPDF)
+      - name: Validate PDF/A-2a and PDF/UA-1 (veraPDF)
         run: |
-          docker run --rm -v "/tmp:/data" verapdf/cli \
-            -f 2a --format text /data/behoerde.pdf \
-            | grep -q '^PASS'
+          for profile in behoerde meeting; do
+            echo "Validating PDF/A-2a for ${profile}.pdf..."
+            docker run --rm -v "/tmp:/data" verapdf/cli \
+              -f 2a --format text "/data/${profile}.pdf" \
+              | grep -q '^PASS' || { echo "FAIL: ${profile}.pdf failed PDF/A-2a validation"; exit 1; }
 
-      - name: Validate PDF/UA-1 (veraPDF)
-        run: |
-          docker run --rm -v "/tmp:/data" verapdf/cli \
-            -f ua1 --format text /data/behoerde.pdf \
-            | grep -q '^PASS'
+            echo "Validating PDF/UA-1 for ${profile}.pdf..."
+            docker run --rm -v "/tmp:/data" verapdf/cli \
+              -f ua1 --format text "/data/${profile}.pdf" \
+              | grep -q '^PASS' || { echo "FAIL: ${profile}.pdf failed PDF/UA-1 validation"; exit 1; }
+          done
