@@ -7,18 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/danieljustus/symaira-print/internal/config"
 	"github.com/danieljustus/symaira-print/internal/press"
 )
 
 // TestNewDoctorCmd_ConfigLoadFallsBackOnError exercises the config.Load()
-// error branch in newDoctorCmd. internal/config caches its loader result
-// process-wide (sync.Once, no exported reset), so this must be the first test
-// in the binary to call config.Load() — otherwise an earlier successful load
-// is served from cache and the malformed file below is never even read. Go
-// runs tests in source declaration order, so this stays the first function
-// declared in this file; do not add another config.Load()-triggering test
-// above it here or in an alphabetically earlier *_test.go in this package.
+// error branch in newDoctorCmd.
 func TestNewDoctorCmd_ConfigLoadFallsBackOnError(t *testing.T) {
+	config.ResetForTest()
 	jsonOut = false
 	home := t.TempDir()
 	t.Setenv("HOME", home)
