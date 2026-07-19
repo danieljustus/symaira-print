@@ -10,6 +10,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/danieljustus/symaira-corekit/mcpserver"
 	"github.com/danieljustus/symaira-print/internal/config"
@@ -114,13 +117,14 @@ func buildServer(cfg *config.Config) *mcpserver.Server {
 		Name: "render_pdf",
 		Description: "Render a Markdown document (with YAML frontmatter) to a PDF file. " +
 			"Provide 'markdown' and 'output_path'. Optional: 'profile', 'pdf_standard' (e.g. [\"a-2a\",\"ua-1\"]), " +
-			"'reproducible'. Returns the output path and render metadata, or a structured error.",
+			"'reproducible', 'overwrite'. Returns the output path and render metadata, or a structured error.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
 			`"markdown":{"type":"string","description":"Markdown source including YAML frontmatter"},` +
 			`"output_path":{"type":"string","description":"Absolute path to write the PDF"},` +
 			`"profile":{"type":"string","description":"Profile name (overrides frontmatter)"},` +
 			`"pdf_standard":{"type":"array","items":{"type":"string"},"description":"typst --pdf-standard ids"},` +
-			`"reproducible":{"type":"boolean"}},"required":["markdown","output_path"]}`),
+			`"reproducible":{"type":"boolean"},` +
+			`"overwrite":{"type":"boolean","description":"Allow overwriting existing non-PDF files"}},"required":["markdown","output_path"]}`),
 		Handler: func(ctx context.Context, in json.RawMessage) (any, error) {
 			var args struct {
 				Markdown     string   `json:"markdown"`
@@ -128,12 +132,19 @@ func buildServer(cfg *config.Config) *mcpserver.Server {
 				Profile      string   `json:"profile"`
 				PDFStandard  []string `json:"pdf_standard"`
 				Reproducible *bool    `json:"reproducible"`
+				Overwrite    bool     `json:"overwrite"`
 			}
 			if err := json.Unmarshal(in, &args); err != nil {
 				return nil, err
 			}
 			if args.OutputPath == "" {
 				return nil, fmt.Errorf("output_path is required")
+			}
+			if err := checkContainment(args.OutputPath, cfg.MCP.OutputRoot); err != nil {
+				return nil, err
+			}
+			if err := checkOverwrite(args.OutputPath, args.Overwrite); err != nil {
+				return nil, err
 			}
 			req := press.Request{
 				Source:           []byte(args.Markdown),
@@ -163,4 +174,84 @@ func engineFromConfig(cfg *config.Config) press.EngineConfig {
 		IgnoreSystemFonts: cfg.Engine.IgnoreSystemFonts,
 		Timeout:           cfg.Engine.Timeout(),
 	}
+}
+
+func checkContainment(outputPath string, outputRoot string) error {
+	if outputRoot == "" {
+		return nil
+	}
+
+	resolvedRoot, err := filepath.Abs(outputRoot)
+	if err != nil {
+		return fmt.Errorf("invalid output root %q: %w", outputRoot, err)
+	}
+	if cleanRoot, err := filepath.EvalSymlinks(resolvedRoot); err == nil {
+		resolvedRoot = cleanRoot
+	}
+
+	resolvedPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		return fmt.Errorf("invalid output path %q: %w", outputPath, err)
+	}
+
+	if cleanPath, err := filepath.EvalSymlinks(resolvedPath); err == nil {
+		resolvedPath = cleanPath
+	} else {
+		dir := filepath.Dir(resolvedPath)
+		if cleanDir, err := filepath.EvalSymlinks(dir); err == nil {
+			resolvedPath = filepath.Join(cleanDir, filepath.Base(resolvedPath))
+		}
+	}
+
+	rel, err := filepath.Rel(resolvedRoot, resolvedPath)
+	if err != nil {
+		return fmt.Errorf("failed to compute relative path: %w", err)
+	}
+
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("output path %q resolves to %q, which is outside the allowed output root %q (resolved: %q); check configuration or specify a path within the root", outputPath, resolvedPath, outputRoot, resolvedRoot)
+	}
+
+	return nil
+}
+
+func checkOverwrite(path string, overwrite bool) error {
+	fi, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return nil
+	}
+	if fi.IsDir() {
+		return fmt.Errorf("output path %q is a directory", path)
+	}
+
+	isPDF, err := hasPDFHeader(path)
+	if err != nil {
+		return fmt.Errorf("could not read existing file: %w", err)
+	}
+
+	if !isPDF && !overwrite {
+		return fmt.Errorf("refusing to overwrite existing non-PDF file %q; pass overwrite=true to force", path)
+	}
+	return nil
+}
+
+func hasPDFHeader(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	buf := make([]byte, 4)
+	n, err := f.Read(buf)
+	if err != nil {
+		return false, nil
+	}
+	if n < 4 {
+		return false, nil
+	}
+	return string(buf) == "%PDF", nil
 }

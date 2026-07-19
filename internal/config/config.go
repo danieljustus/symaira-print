@@ -12,6 +12,13 @@ import (
 type Config struct {
 	Engine   Engine   `json:"engine" toml:"engine"`
 	Defaults Defaults `json:"defaults" toml:"defaults"`
+	MCP      MCP      `json:"mcp" toml:"mcp"`
+}
+
+// MCP controls Model Context Protocol server options.
+type MCP struct {
+	// OutputRoot bounds the allowed output paths for rendered PDFs.
+	OutputRoot string `json:"output_root" toml:"output_root"`
 }
 
 // Engine controls how symprint reaches and drives the typesetting engine.
@@ -56,6 +63,9 @@ func Default() *Config {
 			Profile:      "report",
 			Reproducible: false,
 		},
+		MCP: MCP{
+			OutputRoot: "",
+		},
 	}
 }
 
@@ -75,6 +85,11 @@ var loader = configkit.NewLoader[Config](configkit.Options{
 // Load reads config from disk and environment, falling back to defaults.
 func Load() (*Config, error) {
 	return loader.Load()
+}
+
+// ResetForTest clears the cached configuration in the loader.
+func ResetForTest() {
+	loader.ResetCache()
 }
 
 // Path returns the global config file path (~/.config/symprint/config.toml).
@@ -111,5 +126,10 @@ profile = "report"
 
 # Export SOURCE_DATE_EPOCH for byte-identical output. Profiles/frontmatter win.
 reproducible = false
+
+[mcp]
+# Optional root directory to constrain PDF rendering outputs.
+# When set, any output_path outside this directory is rejected.
+# output_root = "/path/to/allowed/output/dir"
 `
 }

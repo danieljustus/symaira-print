@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/danieljustus/symaira-print/internal/config"
 	"github.com/danieljustus/symaira-print/internal/press"
 )
 
@@ -15,10 +14,7 @@ func newDoctorCmd() *cobra.Command {
 		Use:   "doctor",
 		Short: "Check the rendering engine and optional tools are available",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := config.Load()
-			if err != nil {
-				cfg = config.Default()
-			}
+			cfg := loadConfigOrWarn(cmd)
 			typst := press.DetectTypst(cmd.Context(), cfg.Engine.Typst)
 			pandoc := lookOptional("pandoc")
 			verapdf := lookOptional("verapdf")

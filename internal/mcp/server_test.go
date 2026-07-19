@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -543,5 +544,184 @@ func TestStartServer_WrapsServeError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "mcp server:") {
 		t.Errorf("StartServer() error = %q, want it prefixed with %q", err.Error(), "mcp server:")
+	}
+}
+
+func TestBuildServer_RenderPDF_PathContainment(t *testing.T) {
+	tempDir := t.TempDir()
+	allowedRoot := filepath.Join(tempDir, "allowed")
+	if err := os.MkdirAll(allowedRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	cfg := config.Default()
+	cfg.MCP.OutputRoot = allowedRoot
+	s := buildServer(cfg)
+
+	// Case 1: inside allowed root (should pass containment check)
+	insidePath := filepath.Join(allowedRoot, "out.pdf")
+	inInside := strings.NewReader(rpcLine(t, 1, "tools/call", map[string]any{
+		"name": "render_pdf",
+		"arguments": map[string]any{
+			"markdown":    "---\nprofile: report\ntitle: Test\n---\n\nHello.\n",
+			"output_path": insidePath,
+		},
+	}))
+	var outInside bytes.Buffer
+	if err := s.ServeIO(context.Background(), inInside, &outInside); err != nil {
+		t.Fatalf("ServeIO() error = %v", err)
+	}
+	resInside := readResponses(t, &outInside)[0]
+	resultInside, ok := resInside["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("result missing: %v", resInside)
+	}
+	isErrInside, _ := resultInside["isError"].(bool)
+	// It shouldn't fail with the path containment error (might fail due to typst missing, but that's normal and doesn't mention containment).
+	if isErrInside {
+		content, _ := resultInside["content"].([]any)
+		if len(content) > 0 {
+			msg, _ := content[0].(map[string]any)["text"].(string)
+			if strings.Contains(msg, "outside the allowed output root") {
+				t.Errorf("expected inside path to pass containment, but failed: %s", msg)
+			}
+		}
+	}
+
+	// Case 2: outside allowed root
+	outsidePath := filepath.Join(tempDir, "outside.pdf")
+	inOutside := strings.NewReader(rpcLine(t, 2, "tools/call", map[string]any{
+		"name": "render_pdf",
+		"arguments": map[string]any{
+			"markdown":    "---\nprofile: report\ntitle: Test\n---\n\nHello.\n",
+			"output_path": outsidePath,
+		},
+	}))
+	var outOutside bytes.Buffer
+	if err := s.ServeIO(context.Background(), inOutside, &outOutside); err != nil {
+		t.Fatalf("ServeIO() error = %v", err)
+	}
+	resOutside := readResponses(t, &outOutside)[0]
+	resultOutside, ok := resOutside["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("result missing: %v", resOutside)
+	}
+	isErrOutside, _ := resultOutside["isError"].(bool)
+	if !isErrOutside {
+		t.Error("expected outside path to be rejected, but succeeded")
+	} else {
+		content, _ := resultOutside["content"].([]any)
+		if len(content) > 0 {
+			msg, _ := content[0].(map[string]any)["text"].(string)
+			if !strings.Contains(msg, "outside the allowed output root") {
+				t.Errorf("expected error message to mention 'outside the allowed output root', got: %q", msg)
+			}
+		} else {
+			t.Error("missing error content")
+		}
+	}
+}
+
+func TestBuildServer_RenderPDF_OverwriteProtection(t *testing.T) {
+	tempDir := t.TempDir()
+	nonPDFPath := filepath.Join(tempDir, "existing_text.txt")
+	if err := os.WriteFile(nonPDFPath, []byte("some text content"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	cfg := config.Default()
+	s := buildServer(cfg)
+
+	// Case 1: Overwrite existing non-PDF with overwrite=false (rejected)
+	in1 := strings.NewReader(rpcLine(t, 1, "tools/call", map[string]any{
+		"name": "render_pdf",
+		"arguments": map[string]any{
+			"markdown":    "---\nprofile: report\ntitle: Test\n---\n\nHello.\n",
+			"output_path": nonPDFPath,
+			"overwrite":   false,
+		},
+	}))
+	var out1 bytes.Buffer
+	if err := s.ServeIO(context.Background(), in1, &out1); err != nil {
+		t.Fatalf("ServeIO() error = %v", err)
+	}
+	res1 := readResponses(t, &out1)[0]
+	result1, ok := res1["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("result missing: %v", res1)
+	}
+	isErr1, _ := result1["isError"].(bool)
+	if !isErr1 {
+		t.Error("expected overwrite of non-PDF to fail with overwrite=false, but succeeded")
+	} else {
+		content, _ := result1["content"].([]any)
+		if len(content) > 0 {
+			msg, _ := content[0].(map[string]any)["text"].(string)
+			if !strings.Contains(msg, "refusing to overwrite existing non-PDF file") {
+				t.Errorf("expected error message to mention overwrite refusal, got: %q", msg)
+			}
+		}
+	}
+
+	// Case 2: Overwrite existing non-PDF with overwrite=true (passes overwrite check)
+	in2 := strings.NewReader(rpcLine(t, 2, "tools/call", map[string]any{
+		"name": "render_pdf",
+		"arguments": map[string]any{
+			"markdown":    "---\nprofile: report\ntitle: Test\n---\n\nHello.\n",
+			"output_path": nonPDFPath,
+			"overwrite":   true,
+		},
+	}))
+	var out2 bytes.Buffer
+	if err := s.ServeIO(context.Background(), in2, &out2); err != nil {
+		t.Fatalf("ServeIO() error = %v", err)
+	}
+	res2 := readResponses(t, &out2)[0]
+	result2, ok := res2["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("result missing: %v", res2)
+	}
+	isErr2, _ := result2["isError"].(bool)
+	if isErr2 {
+		content, _ := result2["content"].([]any)
+		if len(content) > 0 {
+			msg, _ := content[0].(map[string]any)["text"].(string)
+			if strings.Contains(msg, "refusing to overwrite") {
+				t.Errorf("expected overwrite=true to bypass overwrite check, but failed: %s", msg)
+			}
+		}
+	}
+
+	// Case 3: Overwrite existing PDF with overwrite=false (passes overwrite check)
+	pdfPath := filepath.Join(tempDir, "existing_pdf.pdf")
+	if err := os.WriteFile(pdfPath, []byte("%PDF-1.4\n..."), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	in3 := strings.NewReader(rpcLine(t, 3, "tools/call", map[string]any{
+		"name": "render_pdf",
+		"arguments": map[string]any{
+			"markdown":    "---\nprofile: report\ntitle: Test\n---\n\nHello.\n",
+			"output_path": pdfPath,
+			"overwrite":   false,
+		},
+	}))
+	var out3 bytes.Buffer
+	if err := s.ServeIO(context.Background(), in3, &out3); err != nil {
+		t.Fatalf("ServeIO() error = %v", err)
+	}
+	res3 := readResponses(t, &out3)[0]
+	result3, ok := res3["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("result missing: %v", res3)
+	}
+	isErr3, _ := result3["isError"].(bool)
+	if isErr3 {
+		content, _ := result3["content"].([]any)
+		if len(content) > 0 {
+			msg, _ := content[0].(map[string]any)["text"].(string)
+			if strings.Contains(msg, "refusing to overwrite") {
+				t.Errorf("expected existing PDF to be overwriteable with overwrite=false, but failed: %s", msg)
+			}
+		}
 	}
 }

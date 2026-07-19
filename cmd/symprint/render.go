@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/danieljustus/symaira-corekit/exitcodes"
-	"github.com/danieljustus/symaira-print/internal/config"
 	"github.com/danieljustus/symaira-print/internal/press"
 )
 
@@ -38,10 +37,7 @@ Examples:
   symprint render report.md --pdf-standard a-2b --reproducible`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load()
-			if err != nil {
-				cfg = config.Default()
-			}
+			cfg := loadConfigOrWarn(cmd)
 
 			src, err := os.ReadFile(args[0])
 			if err != nil {
