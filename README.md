@@ -59,8 +59,8 @@ end-to-end against Typst 0.15.0:
   validation, engine detection, Typst shell-out, reproducible output.
 - CLI: `render`, `profiles`, `validate`, `doctor`, `config`, `mcp`, `version`.
 - MCP stdio server with four tools.
-- All four profiles render. `report` produces cover + TOC + headers + page
-  numbers; `behoerde` produces a verified **PDF/A-2a + PDF/UA-1** file
+- All five profiles render. `report` produces cover + TOC + headers + page
+  numbers; `behoerde` and `meeting` produce a verified **PDF/A-2a + PDF/UA-1** file
   (`pdfaid` + `pdfuaid` + `StructTreeRoot` present).
 - DIN 5008 letter geometry validated against KOMA-Script (LPPL) source values.
 - `veraPDF` CI gating validates PDF/A-2a + PDF/UA-1 conformance on every push/PR.
@@ -144,6 +144,7 @@ Global `--json` emits machine-readable output where supported.
 | `behoerde` | Authority letter (DIN 5008 Form A) | **PDF/A-2a + PDF/UA-1**, DIN window      |
 | `report`   | Report with cover + TOC          | tagged PDF, themed headings, page numbers |
 | `rechnung` | German invoice (data-driven)     | tagged PDF (scaffold)                    |
+| `meeting`  | Meeting minutes                  | **PDF/A-2a + PDF/UA-1**                  |
 
 Full reference: [docs/profiles.md](docs/profiles.md) ·
 contract: [docs/markdown-contract.md](docs/markdown-contract.md).

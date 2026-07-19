@@ -3,9 +3,12 @@
 package config
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/danieljustus/symaira-corekit/configkit"
+	"github.com/danieljustus/symaira-print/internal/press"
 )
 
 // Config is the full symprint configuration.
@@ -99,7 +102,12 @@ func Path() string {
 
 // DefaultConfigTOML is the template written by `symprint config init`.
 func DefaultConfigTOML() string {
-	return `# symprint configuration
+	profs := press.All()
+	names := make([]string, 0, len(profs))
+	for _, p := range profs {
+		names = append(names, p.Name)
+	}
+	return fmt.Sprintf(`# symprint configuration
 # Turns Markdown (+ a frontmatter contract) into beautiful PDFs via named
 # use-case profiles. The typesetting engine (Typst) is reached over PATH and is
 # never linked — symprint stays a single CGO-free Go binary.
@@ -121,7 +129,7 @@ timeout_seconds = 60
 
 [defaults]
 # Profile used when a document does not set 'profile:' in its frontmatter.
-# Built-ins: brief, behoerde, report, rechnung  (see 'symprint profiles').
+# Built-ins: %s  (see 'symprint profiles').
 profile = "report"
 
 # Export SOURCE_DATE_EPOCH for byte-identical output. Profiles/frontmatter win.
@@ -131,5 +139,5 @@ reproducible = false
 # Optional root directory to constrain PDF rendering outputs.
 # When set, any output_path outside this directory is rejected.
 # output_root = "/path/to/allowed/output/dir"
-`
+`, strings.Join(names, ", "))
 }

@@ -1,5 +1,5 @@
 // Command symprint turns Markdown (+ a frontmatter contract) into beautiful PDFs
-// via named use-case profiles (brief, behoerde, report, rechnung), so AI agents,
+// via named use-case profiles (brief, behoerde, report, rechnung, meeting), so AI agents,
 // CLIs and MCP clients get consistent output without the pandoc/LaTeX iteration
 // pain. The typesetting engine (Typst) is reached over PATH, never linked, so
 // symprint stays a single CGO-free binary.
@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -34,23 +35,26 @@ func main() {
 }
 
 func newRootCmd() *cobra.Command {
+	var profileLines []string
+	for _, p := range press.All() {
+		profileLines = append(profileLines, fmt.Sprintf("  %-10s %s", p.Name, p.KeyGuarantees))
+	}
+	longText := fmt.Sprintf(`symprint renders Markdown (+ a YAML frontmatter contract) into polished PDFs
+using named profiles that fix every visual decision for a use case:
+
+%s
+
+The engine is Typst, reached over PATH (run 'symprint doctor' to check). The
+contract is strict: unknown frontmatter keys are rejected, so what you write is
+what you get. Designed to be driven by humans, CLIs, and AI agents (MCP).`, strings.Join(profileLines, "\n"))
+
 	root := &cobra.Command{
 		Use:           "symprint",
 		Short:         "Markdown → beautiful PDF via named use-case profiles",
 		Version:       version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Long: `symprint renders Markdown (+ a YAML frontmatter contract) into polished PDFs
-using named profiles that fix every visual decision for a use case:
-
-  brief      DIN 5008 letter (Form B)
-  behoerde   DIN 5008 authority letter (Form A) + PDF/A-2a + PDF/UA-1
-  report     cover page, table of contents, headers/footers, page numbers
-  rechnung   data-driven German invoice (scaffold)
-
-The engine is Typst, reached over PATH (run 'symprint doctor' to check). The
-contract is strict: unknown frontmatter keys are rejected, so what you write is
-what you get. Designed to be driven by humans, CLIs, and AI agents (MCP).`,
+		Long:          longText,
 	}
 
 	root.PersistentFlags().BoolVar(&jsonOut, "json", false, "emit machine-readable JSON")

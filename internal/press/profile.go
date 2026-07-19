@@ -18,6 +18,9 @@ type Profile struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 
+	// KeyGuarantees summarizes the key capabilities/guarantees for help texts.
+	KeyGuarantees string `json:"key_guarantees,omitempty"`
+
 	// Template is the embedded Typst file used to render this profile.
 	Template string `json:"template"`
 	// Engine selects the rendering engine. Only "typst" exists today; the
@@ -63,6 +66,7 @@ var builtins = map[string]Profile{
 		Name:           "brief",
 		Title:          "Brief (DIN 5008)",
 		Description:    "General German business letter. Defaults to DIN 5008 Form B (45 mm Briefkopf). Tagged PDF, no archival requirement.",
+		KeyGuarantees:  "DIN 5008 letter (Form B)",
 		Template:       "brief.typ",
 		Engine:         "typst",
 		Form:           "B",
@@ -75,6 +79,7 @@ var builtins = map[string]Profile{
 		Name:           "behoerde",
 		Title:          "Behörde (DIN 5008 + PDF/A + PDF/UA)",
 		Description:    "Authority letter: DIN 5008 Form A plus archival (PDF/A-2a) and accessible (PDF/UA-1) output for E-Government / BITV 2.0 compliance.",
+		KeyGuarantees:  "DIN 5008 authority letter (Form A) + PDF/A-2a + PDF/UA-1",
 		Template:       "behoerde.typ",
 		Engine:         "typst",
 		Form:           "A",
@@ -87,6 +92,7 @@ var builtins = map[string]Profile{
 		Name:           "report",
 		Title:          "Report / Bericht",
 		Description:    "Multi-page report with cover page, automatic table of contents, running header/footer, page numbers, and themed headings.",
+		KeyGuarantees:  "cover page, table of contents, headers/footers, page numbers",
 		Template:       "report.typ",
 		Engine:         "typst",
 		Form:           "",
@@ -99,6 +105,7 @@ var builtins = map[string]Profile{
 		Name:           "rechnung",
 		Title:          "Rechnung (DIN 5008)",
 		Description:    "German invoice with windowed-envelope recipient, line items and VAT. Driven by a `data:` block. (Scaffold — VAT/GiroCode in Phase 4.)",
+		KeyGuarantees:  "data-driven German invoice (scaffold)",
 		Template:       "rechnung.typ",
 		Engine:         "typst",
 		Form:           "B",
@@ -111,6 +118,7 @@ var builtins = map[string]Profile{
 		Name:           "meeting",
 		Title:          "Meeting Minutes",
 		Description:    "Accessible and archivable meeting minutes profile. Automatically formats metadata, participants, duration, location, and structured sections (Summary, Decisions, Action Items, Notes, Transcript).",
+		KeyGuarantees:  "meeting minutes + PDF/A-2a + PDF/UA-1",
 		Template:       "meeting.typ",
 		Engine:         "typst",
 		Form:           "",

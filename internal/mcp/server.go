@@ -41,11 +41,36 @@ func StartServer(ctx context.Context, cfg *config.Config) error {
 
 func buildServer(cfg *config.Config) *mcpserver.Server {
 	s := mcpserver.New("symprint", ServerVersion)
-	s.SetInstructions("Render Markdown into beautiful PDFs via named profiles " +
-		"(brief, behoerde, report, rechnung). Call list_profiles to choose a profile, " +
-		"validate_document to check frontmatter before rendering, and render_pdf to " +
-		"produce the file. The 'behoerde' profile emits accessible/archival PDF/A+UA. " +
-		"Markdown carries YAML frontmatter; unknown keys are rejected.")
+
+	profs := press.All()
+	var names []string
+	var accessible []string
+	for _, p := range profs {
+		names = append(names, p.Name)
+		cap := p.Capability()
+		if cap.PDFA && cap.PDFUA {
+			accessible = append(accessible, fmt.Sprintf("'%s'", p.Name))
+		}
+	}
+
+	var accessibleStr string
+	if len(accessible) > 1 {
+		last := accessible[len(accessible)-1]
+		rest := accessible[:len(accessible)-1]
+		accessibleStr = fmt.Sprintf("The %s and %s profiles emit", strings.Join(rest, ", "), last)
+	} else if len(accessible) == 1 {
+		accessibleStr = fmt.Sprintf("The %s profile emits", accessible[0])
+	} else {
+		accessibleStr = "No profiles emit"
+	}
+
+	instructions := fmt.Sprintf("Render Markdown into beautiful PDFs via named profiles (%s). "+
+		"Call list_profiles to choose a profile, validate_document to check frontmatter before rendering, "+
+		"and render_pdf to produce the file. %s accessible/archival PDF/A+UA. "+
+		"Markdown carries YAML frontmatter; unknown keys are rejected.",
+		strings.Join(names, ", "), accessibleStr)
+
+	s.SetInstructions(instructions)
 
 	s.RegisterTool(&mcpserver.Tool{
 		Name:        "list_profiles",
