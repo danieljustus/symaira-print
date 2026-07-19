@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -145,6 +146,21 @@ func TestTruncate(t *testing.T) {
 		got := truncate(tt.input, tt.n)
 		if got != tt.want {
 			t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.n, got, tt.want)
+		}
+	}
+}
+
+func TestReadmeDriftGuard(t *testing.T) {
+	content, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Fatalf("failed to read README.md: %v", err)
+	}
+	readme := string(content)
+
+	for _, p := range press.All() {
+		pattern := "`" + p.Name + "`"
+		if !strings.Contains(readme, pattern) {
+			t.Errorf("profile %q is not documented in README.md (missing %s)", p.Name, pattern)
 		}
 	}
 }
