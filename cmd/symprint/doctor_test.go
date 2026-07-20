@@ -76,6 +76,8 @@ func TestNewDoctorCmd_JSON(t *testing.T) {
 }
 
 func TestNewDoctorCmd_TypstUnavailable(t *testing.T) {
+	press.ResetProbeCache()
+	defer press.ResetProbeCache()
 	jsonOut = false
 	// config.Load() caches process-wide (sync.Once), so overriding
 	// SYMPRINT_ENGINE_TYPST here would not be picked up once another test has

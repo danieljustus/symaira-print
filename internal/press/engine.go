@@ -4,6 +4,8 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Capability describes what an engine/profile combination guarantees.
@@ -31,6 +33,24 @@ const TypstInstallHint = "typst not found on PATH. Install it with one of:\n" +
 	"  • Cargo:   cargo install typst-cli\n" +
 	"  • Binary:  https://github.com/typst/typst/releases (put it on PATH)"
 
+type engineProbeCacheEntry struct {
+	info      EngineInfo
+	expiresAt time.Time
+}
+
+var (
+	probeCacheMu sync.Mutex
+	probeCache   = make(map[string]engineProbeCacheEntry)
+)
+
+// ResetProbeCache clears the cached typst version and path queries.
+// It is intended for testing.
+func ResetProbeCache() {
+	probeCacheMu.Lock()
+	defer probeCacheMu.Unlock()
+	probeCache = make(map[string]engineProbeCacheEntry)
+}
+
 // DetectTypst probes for the typst binary. binOverride may name a specific
 // binary or path; empty means resolve "typst" from PATH. It never errors — an
 // absent engine is reported via Available=false plus an install Hint, which is
@@ -40,10 +60,25 @@ func DetectTypst(ctx context.Context, binOverride string) EngineInfo {
 	if name == "" {
 		name = "typst"
 	}
+
+	probeCacheMu.Lock()
+	entry, exists := probeCache[name]
+	if exists && time.Now().Before(entry.expiresAt) {
+		probeCacheMu.Unlock()
+		return entry.info
+	}
+	probeCacheMu.Unlock()
+
 	info := EngineInfo{Name: "typst"}
 	path, err := exec.LookPath(name)
 	if err != nil {
 		info.Hint = TypstInstallHint
+		probeCacheMu.Lock()
+		probeCache[name] = engineProbeCacheEntry{
+			info:      info,
+			expiresAt: time.Now().Add(10 * time.Second),
+		}
+		probeCacheMu.Unlock()
 		return info
 	}
 	info.Path = path
@@ -51,6 +86,14 @@ func DetectTypst(ctx context.Context, binOverride string) EngineInfo {
 	if v := typstVersion(ctx, path); v != "" {
 		info.Version = v
 	}
+
+	probeCacheMu.Lock()
+	probeCache[name] = engineProbeCacheEntry{
+		info:      info,
+		expiresAt: time.Now().Add(10 * time.Second),
+	}
+	probeCacheMu.Unlock()
+
 	return info
 }
 

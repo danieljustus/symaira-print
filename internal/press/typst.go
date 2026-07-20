@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/danieljustus/symaira-print/internal/assets"
@@ -18,6 +19,58 @@ import (
 // the Typst binary. Typst fetches & caches it on first compile (needs network
 // once); Phase 2 vendors it into the package cache for full offline operation.
 const cmarkerVersion = "0.1.9"
+
+var (
+	assetsCacheMu  sync.Mutex
+	assetsCacheDir string
+	assetsCacheErr error
+)
+
+// ResetAssetsCache cleans up the cached directory and resets cache state.
+// It is intended for testing.
+func ResetAssetsCache() {
+	assetsCacheMu.Lock()
+	defer assetsCacheMu.Unlock()
+	if assetsCacheDir != "" {
+		os.RemoveAll(assetsCacheDir)
+		assetsCacheDir = ""
+	}
+	assetsCacheErr = nil
+}
+
+func getOrInitializeAssetsCache() (string, error) {
+	assetsCacheMu.Lock()
+	defer assetsCacheMu.Unlock()
+	if assetsCacheDir != "" {
+		return assetsCacheDir, nil
+	}
+	if assetsCacheErr != nil {
+		return "", assetsCacheErr
+	}
+
+	dir, err := os.MkdirTemp("", "symprint-assets-cache-*")
+	if err != nil {
+		assetsCacheErr = err
+		return "", err
+	}
+
+	tplDir := filepath.Join(dir, "templates")
+	if err := assets.Materialize(tplDir); err != nil {
+		os.RemoveAll(dir)
+		assetsCacheErr = err
+		return "", err
+	}
+
+	fontDir := filepath.Join(dir, "fonts")
+	if _, err := assets.MaterializeFonts(fontDir); err != nil {
+		os.RemoveAll(dir)
+		assetsCacheErr = err
+		return "", err
+	}
+
+	assetsCacheDir = dir
+	return assetsCacheDir, nil
+}
 
 type typstJob struct {
 	profile      Profile
@@ -43,14 +96,23 @@ func renderTypst(ctx context.Context, eng EngineInfo, job typstJob) (*Result, er
 	}
 	defer os.RemoveAll(work)
 
+	cacheDir, err := getOrInitializeAssetsCache()
+	if err != nil {
+		return nil, &RenderError{Stage: "write", Message: "could not initialize assets cache", Err: err}
+	}
+
 	tplDir := filepath.Join(work, "templates")
-	if err := assets.Materialize(tplDir); err != nil {
-		return nil, &RenderError{Stage: "write", Message: "could not materialize templates", Err: err}
+	if err := os.Symlink(filepath.Join(cacheDir, "templates"), tplDir); err != nil {
+		if err := assets.Materialize(tplDir); err != nil {
+			return nil, &RenderError{Stage: "write", Message: "could not materialize templates", Err: err}
+		}
 	}
 
 	fontDir := filepath.Join(work, "fonts")
-	if _, err := assets.MaterializeFonts(fontDir); err != nil {
-		return nil, &RenderError{Stage: "write", Message: "could not materialize fonts", Err: err}
+	if err := os.Symlink(filepath.Join(cacheDir, "fonts"), fontDir); err != nil {
+		if _, err := assets.MaterializeFonts(fontDir); err != nil {
+			return nil, &RenderError{Stage: "write", Message: "could not materialize fonts", Err: err}
+		}
 	}
 
 	metaJSON, err := json.MarshalIndent(job.front, "", "  ")

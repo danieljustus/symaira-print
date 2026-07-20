@@ -2,6 +2,7 @@ package press
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -460,6 +461,8 @@ func TestRenderIntegration(t *testing.T) {
 func boolPtr(b bool) *bool { return &b }
 
 func TestDetectTypstNotFound(t *testing.T) {
+	ResetProbeCache()
+	defer ResetProbeCache()
 	origPath := os.Getenv("PATH")
 	os.Setenv("PATH", "")
 	defer os.Setenv("PATH", origPath)
@@ -607,5 +610,109 @@ location: "Online"
 	}
 	if result.Profile != "meeting" {
 		t.Errorf("profile = %q, want %q", result.Profile, "meeting")
+	}
+}
+
+func TestDetectTypstCache(t *testing.T) {
+	ResetProbeCache()
+	defer ResetProbeCache()
+
+	binDir := t.TempDir()
+	counterFile := filepath.Join(binDir, "calls.txt")
+	script := fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  echo 1 >> %s\n  echo 'typst 0.15.0 (abcd1234)'\nfi\n", counterFile)
+	mockBin := filepath.Join(binDir, "typst-mock-cache")
+	if err := os.WriteFile(mockBin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+
+	// 1st probe: should call binary
+	info1 := DetectTypst(ctx, mockBin)
+	if !info1.Available || info1.Version != "0.15.0" {
+		t.Fatalf("first probe failed: %+v", info1)
+	}
+
+	// Read call counter
+	data, err := os.ReadFile(counterFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(data), "1") != 1 {
+		t.Fatalf("expected 1 call, got %d", strings.Count(string(data), "1"))
+	}
+
+	// 2nd probe: should hit cache and NOT call binary
+	info2 := DetectTypst(ctx, mockBin)
+	if !info2.Available || info2.Version != "0.15.0" {
+		t.Fatalf("second probe failed: %+v", info2)
+	}
+
+	// Verify call counter didn't increase
+	data, err = os.ReadFile(counterFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(data), "1") != 1 {
+		t.Fatalf("expected 1 call (cached), got %d", strings.Count(string(data), "1"))
+	}
+}
+
+func TestAssetsCache(t *testing.T) {
+	ResetAssetsCache()
+	defer ResetAssetsCache()
+
+	// Initialize first time
+	cacheDir1, err := getOrInitializeAssetsCache()
+	if err != nil {
+		t.Fatalf("failed to initialize assets cache: %v", err)
+	}
+	if cacheDir1 == "" {
+		t.Fatal("expected non-empty cache directory path")
+	}
+
+	// Check that templates and fonts directories were created inside cacheDir1
+	if _, err := os.Stat(filepath.Join(cacheDir1, "templates")); err != nil {
+		t.Errorf("templates dir missing in cache: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cacheDir1, "fonts")); err != nil {
+		t.Errorf("fonts dir missing in cache: %v", err)
+	}
+
+	// Initialize second time
+	cacheDir2, err := getOrInitializeAssetsCache()
+	if err != nil {
+		t.Fatalf("failed to get assets cache second time: %v", err)
+	}
+	if cacheDir2 != cacheDir1 {
+		t.Errorf("expected same cache directory, got %q and %q", cacheDir1, cacheDir2)
+	}
+
+	// Now run a successful mock render to check if symlinks are created and work
+	binDir := t.TempDir()
+	mockTypst(t, binDir, true)
+	origPath := os.Getenv("PATH")
+	os.Setenv("PATH", binDir+":"+origPath)
+	defer os.Setenv("PATH", origPath)
+
+	eng := EngineInfo{
+		Available: true,
+		Path:      filepath.Join(binDir, "typst"),
+		Version:   "0.15.0",
+	}
+	job := typstJob{
+		profile: Profile{
+			Name:     "report",
+			Template: "report.typ",
+		},
+		front:      Frontmatter{Profile: "report"},
+		body:       []byte("# Hello\n"),
+		outputPath: filepath.Join(t.TempDir(), "out.pdf"),
+		timeout:    10 * time.Second,
+	}
+
+	_, err = renderTypst(context.Background(), eng, job)
+	if err != nil {
+		t.Fatalf("renderTypst failed: %v", err)
 	}
 }
