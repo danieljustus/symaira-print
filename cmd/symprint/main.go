@@ -21,7 +21,7 @@ import (
 	"github.com/danieljustus/symaira-print/internal/press"
 )
 
-var version = "0.1.0-dev"
+var version = "0.2.0"
 
 // jsonOut is bound to the global --json flag.
 var jsonOut bool
