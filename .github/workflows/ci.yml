@@ -97,9 +97,9 @@ jobs:
 
       # Standards gate. Coverage note (see docs/ci-coverage.md):
       #  - behoerde/meeting: prose documents — headings, lists, lang/title.
-      #  - a11y-fixture: multi-level non-skipping heading hierarchy (H1-H3)
-      #    and a table with header row. Images/alt-text are NOT covered: the
-      #    engine root is a temp dir, so relative image paths cannot resolve.
+      #  - a11y-fixture: multi-level non-skipping heading hierarchy (H1-H3),
+      #    table with header row, and image with alt text. Images resolve
+      #    relative to the source file; the work dir receives a copy.
       - name: Validate PDF/A-2a and PDF/UA-1 (veraPDF)
         run: |
           for profile in behoerde meeting a11y-fixture; do
