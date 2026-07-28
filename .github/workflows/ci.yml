@@ -13,14 +13,14 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.4'
+          go-version: '1.26.5'
 
       - name: Vet
         run: CGO_ENABLED=0 go vet ./...
@@ -64,27 +64,45 @@ jobs:
   render-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.26.4'
+          go-version: '1.26.5'
       - name: Install Typst
         uses: typst-community/setup-typst@63ac138db421d586de61f7f5ac3bcef6a2e6c78c # v5
         with:
           typst-version: '0.15.0'
       - name: Build
         run: CGO_ENABLED=0 go build -o symprint ./cmd/symprint
+      # Renders every examples/*.md with --reproducible (SOURCE_DATE_EPOCH=0)
+      # so output is byte-stable for the hash gate below. System fonts are
+      # ignored by default, so results do not depend on the runner image.
       - name: Render examples
         run: |
-          for name in report behoerde brief meeting rechnung; do
-            ./symprint render "examples/${name}.md" -o "/tmp/${name}.pdf"
+          for src in examples/*.md; do
+            name=$(basename "$src" .md)
+            ./symprint render "$src" --reproducible -o "/tmp/${name}.pdf"
           done
           file /tmp/*.pdf
 
+      # Render-regression gate: any silent change in rendered output (template,
+      # profile, engine or cmarker upgrade) changes a SHA-256 and fails here.
+      # Deliberate changes must regenerate the baseline with `make hashes`
+      # (requires the same Typst version pinned above) and review the diff.
+      - name: Verify hashed reference outputs
+        run: |
+          cd /tmp
+          sha256sum -c "$GITHUB_WORKSPACE/testdata/example-hashes.sha256"
+
+      # Standards gate. Coverage note (see docs/ci-coverage.md):
+      #  - behoerde/meeting: prose documents — headings, lists, lang/title.
+      #  - a11y-fixture: multi-level non-skipping heading hierarchy (H1-H3)
+      #    and a table with header row. Images/alt-text are NOT covered: the
+      #    engine root is a temp dir, so relative image paths cannot resolve.
       - name: Validate PDF/A-2a and PDF/UA-1 (veraPDF)
         run: |
-          for profile in behoerde meeting; do
+          for profile in behoerde meeting a11y-fixture; do
             echo "Validating PDF/A-2a for ${profile}.pdf..."
             docker run --rm -v "/tmp:/data" verapdf/cli \
               -f 2a --format text "/data/${profile}.pdf" \

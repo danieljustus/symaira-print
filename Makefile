@@ -45,6 +45,25 @@ clean:
 install:
 	CGO_ENABLED=0 $(GO) install -ldflags "-s -w -X $(VERSION_PKG).version=dev" ./cmd/symprint
 
+# Regenerate testdata/example-hashes.sha256, the hashed reference outputs
+# that CI verifies on every push (render-regression gate). Run this after any
+# intentional template, profile or example change and review the diff.
+# IMPORTANT: hashes are only stable with the same Typst version CI pins
+# (typst-version in .github/workflows/ci.yml). Check `typst --version` first.
+.PHONY: hashes
+hashes: build
+	@tmp=$$(mktemp -d) ; \
+	trap 'rm -rf "$$tmp"' EXIT ; \
+	for src in examples/*.md ; do \
+		name=$$(basename "$$src" .md) ; \
+		./$(BINARY_NAME) render "$$src" --reproducible -o "$$tmp/$$name.pdf" >/dev/null || exit 1 ; \
+	done ; \
+	mkdir -p testdata ; \
+	( cd "$$tmp" && \
+		if command -v sha256sum >/dev/null 2>&1 ; then sha256sum *.pdf ; \
+		else shasum -a 256 *.pdf ; fi ) > testdata/example-hashes.sha256 ; \
+	echo "wrote testdata/example-hashes.sha256"
+
 # Render the example documents (requires `typst` on PATH).
 .PHONY: examples
 examples: build
