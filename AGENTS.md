@@ -51,8 +51,9 @@ test** that compiles `examples/*.md` with a real Typst. Keep them green.
 
 - Typst is invoked as `typst compile --root <work> [--pdf-standard …] main.typ out.pdf`.
 - Markdown → Typst is done **in-engine** by the `@preview/cmarker` package (no
-  pandoc). Typst fetches it into its package cache on first compile (network
-  once); vendoring it is a Phase 2 task.
+  pandoc). cmarker 0.1.9 is vendored under `internal/assets/packages/` and
+  materialized per render — no network access needed, and renders never write
+  to the user's real Typst package cache.
 - PDF/A + PDF/UA come from `--pdf-standard a-2a,ua-1`. Typst validates PDF/UA at
   compile time and *fails closed* (e.g. headings must start at level 1) — this
   is intended; fix the document, don't loosen the profile.

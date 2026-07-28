@@ -179,6 +179,9 @@ func buildServer(cfg *config.Config) *mcpserver.Server {
 				DefaultProfile:   cfg.Defaults.Profile,
 				StandardOverride: args.PDFStandard,
 				Reproducible:     args.Reproducible,
+				// MCP is a machine-facing surface: request the engine's
+				// short one-line-per-diagnostic format for RenderError.Detail.
+				ShortDiagnostics: true,
 				Engine:           engineFromConfig(cfg),
 			}
 			res, err := press.Render(ctx, req)

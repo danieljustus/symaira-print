@@ -231,8 +231,8 @@ test. End-to-end render of all four profiles verified.
 ### Phase 2 — Determinism & offline
 - Embed brand fonts via `go:embed`; pass `--font-path` + `--ignore-system-fonts`
   for machine-independent output; ship a sans face for DIN sub-10pt text. ✅
-- **Vendor the `cmarker` (and `mitex`) packages** into the Typst package cache so
-  the first render needs no network → fully standalone.
+- **Vendor the `cmarker` package** so the first render needs no network → fully
+  standalone. ✅ (`mitex` vendoring follows with the math support work.)
 - Pin the Typst version and hash-test sample outputs in CI.
 
 ### Phase 3 — Richer documents & post-processing
@@ -268,8 +268,6 @@ test. End-to-end render of all four profiles verified.
   drift across minors. PDF/UA-2 is not available yet (planned later 2026).
 - **cmarker limits**: no reusable Typst functions / native Typst math from inside
   Markdown; mitigated by the math callback and the optional pandoc path.
-- **First-render network**: cmarker is fetched once into Typst's cache — vendor
-  it in P2 for true offline use.
 - **Accessibility ≠ automatic**: structural PDF/UA can pass while human
   Matterhorn checkpoints (meaningful alt text, reading order) still need author
   input. The tool enforces structure and surfaces the rest.

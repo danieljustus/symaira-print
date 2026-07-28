@@ -15,9 +15,10 @@ import (
 	"github.com/danieljustus/symaira-print/internal/assets"
 )
 
-// cmarkerVersion pins the @preview/cmarker package that parses CommonMark inside
-// the Typst binary. Typst fetches & caches it on first compile (needs network
-// once); Phase 2 vendors it into the package cache for full offline operation.
+// cmarkerVersion pins the vendored @preview/cmarker package that parses
+// CommonMark inside the Typst binary. The package files are embedded in the
+// binary (internal/assets/packages) and materialized per render, so typst
+// resolves the import locally without network access.
 const cmarkerVersion = "0.1.9"
 
 var (
@@ -68,20 +69,27 @@ func getOrInitializeAssetsCache() (string, error) {
 		return "", err
 	}
 
+	if err := assets.MaterializePackages(dir); err != nil {
+		os.RemoveAll(dir)
+		assetsCacheErr = err
+		return "", err
+	}
+
 	assetsCacheDir = dir
 	return assetsCacheDir, nil
 }
 
 type typstJob struct {
-	profile      Profile
-	front        Frontmatter
-	body         []byte
-	outputPath   string
-	pdfStandard  []string
-	reproducible bool
-	fontPaths    []string
-	ignoreFonts  bool
-	timeout      time.Duration
+	profile          Profile
+	front            Frontmatter
+	body             []byte
+	outputPath       string
+	pdfStandard      []string
+	reproducible     bool
+	fontPaths        []string
+	ignoreFonts      bool
+	shortDiagnostics bool
+	timeout          time.Duration
 }
 
 // renderTypst materializes the work dir (templates + fonts + meta.json + body.md
@@ -115,6 +123,13 @@ func renderTypst(ctx context.Context, eng EngineInfo, job typstJob) (*Result, er
 		}
 	}
 
+	pkgRoot := filepath.Join(work, "packages")
+	if err := os.Symlink(filepath.Join(cacheDir, "packages"), pkgRoot); err != nil {
+		if err := assets.MaterializePackages(work); err != nil {
+			return nil, &RenderError{Stage: "write", Message: "could not materialize vendored packages", Err: err}
+		}
+	}
+
 	metaJSON, err := json.MarshalIndent(job.front, "", "  ")
 	if err != nil {
 		return nil, &RenderError{Stage: "write", Message: "could not encode metadata", Err: err}
@@ -138,6 +153,20 @@ func renderTypst(ctx context.Context, eng EngineInfo, job typstJob) (*Result, er
 	}
 
 	args := []string{"compile", "--root", work}
+
+	// Resolve @preview/* imports (cmarker) from the vendored, embedded tree
+	// instead of the network, and point the package cache at a per-render dir
+	// so typst never needs the user's global package cache for these imports.
+	args = append(args, "--package-path", pkgRoot)
+	args = append(args, "--package-cache-path", filepath.Join(work, "package-cache"))
+
+	// Machine-facing surfaces (MCP, --json) request typst's short diagnostic
+	// format (one line per diagnostic: file:line:col: error: message);
+	// interactive terminal renders keep the rich human format. Requires
+	// typst >= 0.13; cleanTypstError stays as the truncation backstop.
+	if job.shortDiagnostics {
+		args = append(args, "--diagnostic-format", "short")
+	}
 
 	// Always include the embedded font directory for machine-independent output.
 	args = append(args, "--font-path", fontDir)
