@@ -83,6 +83,7 @@ type typstJob struct {
 	profile          Profile
 	front            Frontmatter
 	body             []byte
+	sourceDir        string
 	outputPath       string
 	pdfStandard      []string
 	reproducible     bool
@@ -139,6 +140,12 @@ func renderTypst(ctx context.Context, eng EngineInfo, job typstJob) (*Result, er
 	}
 	if err := os.WriteFile(filepath.Join(work, "body.md"), job.body, 0o644); err != nil {
 		return nil, &RenderError{Stage: "write", Message: "could not write body", Err: err}
+	}
+	// Copy locally referenced Markdown images into the work dir so the engine
+	// resolves them under --root. Fails closed on missing files, absolute
+	// paths, traversal and symlink escapes.
+	if err := collectAssets(job.sourceDir, work, job.body); err != nil {
+		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(work, "main.typ"), []byte(mainTyp(job.profile.Template)), 0o644); err != nil {
 		return nil, &RenderError{Stage: "write", Message: "could not write entry", Err: err}

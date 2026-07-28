@@ -25,3 +25,4 @@ examples/*.pdf
 client/build/
 client/*.xcodeproj
 
+internal/press/--version

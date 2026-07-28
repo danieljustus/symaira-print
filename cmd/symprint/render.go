@@ -43,6 +43,10 @@ Examples:
 			if err != nil {
 				return exitcodes.Wrap(err, exitcodes.ExitNoInput, exitcodes.KindNotFound, "read input")
 			}
+			srcAbs, err := filepath.Abs(args[0])
+			if err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitNoInput, exitcodes.KindNotFound, "resolve input path")
+			}
 
 			out := output
 			if out == "" {
@@ -52,6 +56,7 @@ Examples:
 			req := press.Request{
 				Source:          src,
 				SourceName:      args[0],
+				SourceDir:       filepath.Dir(srcAbs),
 				OutputPath:      out,
 				ProfileOverride: profile, // empty unless --profile was passed
 				DefaultProfile:  cfg.Defaults.Profile,

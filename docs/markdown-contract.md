@@ -100,6 +100,13 @@ For `behoerde` profiles (PDF/A-2a + PDF/UA-1), authors are responsible for:
   image's content or function, not just its appearance. Decorative images should
   use `alt=""` (empty string).
 
+  Local image paths resolve **relative to the Markdown file** and must stay
+  inside its directory tree — absolute paths, `..` traversal and symlinks
+  pointing outside are rejected with a clear error. Only the inline syntax
+  `![alt](path)` is resolved; reference-style images (`![alt][id]`) and remote
+  URLs are not copied into the render. Renders without a filesystem base
+  (MCP) cannot resolve local images.
+
 - **Heading hierarchy**: Start with `# Heading 1` and don't skip levels. PDF/UA
   requires a logical heading tree — screen readers use it for navigation.
 
