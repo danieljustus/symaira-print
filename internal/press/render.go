@@ -29,6 +29,13 @@ type Request struct {
 	// only when neither an override nor the frontmatter selects a profile.
 	DefaultProfile string
 
+	// ShortDiagnostics requests the engine's short diagnostic format
+	// (one line per diagnostic: file:line:col: error: message) for
+	// machine-facing surfaces such as the MCP server and --json output.
+	// Leave false for interactive terminal renders, which keep the rich
+	// human format.
+	ShortDiagnostics bool
+
 	Engine EngineConfig
 }
 
@@ -115,15 +122,16 @@ func Render(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	job := typstJob{
-		profile:      prof,
-		front:        doc.Front,
-		body:         doc.Body,
-		outputPath:   req.OutputPath,
-		pdfStandard:  std,
-		reproducible: repro,
-		fontPaths:    req.Engine.FontPaths,
-		ignoreFonts:  req.Engine.IgnoreSystemFonts,
-		timeout:      req.Engine.Timeout,
+		profile:          prof,
+		front:            doc.Front,
+		body:             doc.Body,
+		outputPath:       req.OutputPath,
+		pdfStandard:      std,
+		reproducible:     repro,
+		fontPaths:        req.Engine.FontPaths,
+		ignoreFonts:      req.Engine.IgnoreSystemFonts,
+		shortDiagnostics: req.ShortDiagnostics,
+		timeout:          req.Engine.Timeout,
 	}
 	return renderTypst(ctx, eng, job)
 }

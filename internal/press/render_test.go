@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -714,5 +715,174 @@ func TestAssetsCache(t *testing.T) {
 	_, err = renderTypst(context.Background(), eng, job)
 	if err != nil {
 		t.Fatalf("renderTypst failed: %v", err)
+	}
+}
+
+// captureArgsTypst creates a fake typst that records its argv and succeeds.
+func captureArgsTypst(t *testing.T, dir string) string {
+	t.Helper()
+	argCapture := filepath.Join(dir, "args.txt")
+	script := "#!/bin/sh\necho \"$@\" > " + argCapture + "\neval out=\\${$#}; > \"$out\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "typst"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return argCapture
+}
+
+func baseTestJob(outDir string) typstJob {
+	return typstJob{
+		profile: Profile{
+			Name:     "report",
+			Template: "report.typ",
+		},
+		front:      Frontmatter{Profile: "report"},
+		body:       []byte("# Hello\n"),
+		outputPath: filepath.Join(outDir, "out.pdf"),
+		timeout:    10 * time.Second,
+	}
+}
+
+func TestRenderTypstPackageArgs(t *testing.T) {
+	ResetAssetsCache()
+	defer ResetAssetsCache()
+
+	binDir := t.TempDir()
+	argCapture := captureArgsTypst(t, binDir)
+
+	eng := EngineInfo{
+		Available: true,
+		Path:      filepath.Join(binDir, "typst"),
+		Version:   "0.15.0",
+	}
+	job := baseTestJob(t.TempDir())
+
+	if _, err := renderTypst(context.Background(), eng, job); err != nil {
+		t.Fatalf("renderTypst failed: %v", err)
+	}
+
+	data, err := os.ReadFile(argCapture)
+	if err != nil {
+		t.Fatalf("failed to read captured args: %v", err)
+	}
+	args := string(data)
+
+	if !strings.Contains(args, "--package-path") {
+		t.Errorf("missing --package-path flag, got: %s", args)
+	}
+	// The --package-path value must point at the directory *containing*
+	// preview/cmarker/0.1.9 (i.e. end in /packages).
+	if !strings.Contains(args, "--package-path ") || !strings.Contains(args, "/packages ") && !strings.HasSuffix(strings.TrimSpace(args), "/packages") {
+		t.Errorf("--package-path should point at the packages dir, got: %s", args)
+	}
+	if !strings.Contains(args, "--package-cache-path") {
+		t.Errorf("missing --package-cache-path flag, got: %s", args)
+	}
+}
+
+func TestRenderTypstShortDiagnosticsFlag(t *testing.T) {
+	ResetAssetsCache()
+	defer ResetAssetsCache()
+
+	binDir := t.TempDir()
+	argCapture := captureArgsTypst(t, binDir)
+
+	eng := EngineInfo{
+		Available: true,
+		Path:      filepath.Join(binDir, "typst"),
+		Version:   "0.15.0",
+	}
+
+	// Machine-facing render (MCP / --json): short format is requested.
+	job := baseTestJob(t.TempDir())
+	job.shortDiagnostics = true
+	if _, err := renderTypst(context.Background(), eng, job); err != nil {
+		t.Fatalf("renderTypst (short diagnostics) failed: %v", err)
+	}
+	data, err := os.ReadFile(argCapture)
+	if err != nil {
+		t.Fatalf("failed to read captured args: %v", err)
+	}
+	if !strings.Contains(string(data), "--diagnostic-format short") {
+		t.Errorf("missing --diagnostic-format short, got: %s", data)
+	}
+
+	// Interactive render: rich human format stays the default (no flag).
+	job = baseTestJob(t.TempDir())
+	if _, err := renderTypst(context.Background(), eng, job); err != nil {
+		t.Fatalf("renderTypst (default diagnostics) failed: %v", err)
+	}
+	data, err = os.ReadFile(argCapture)
+	if err != nil {
+		t.Fatalf("failed to read captured args: %v", err)
+	}
+	if strings.Contains(string(data), "--diagnostic-format") {
+		t.Errorf("interactive render must not pass --diagnostic-format, got: %s", data)
+	}
+}
+
+func TestRenderTypstShortDiagnosticsCompactShape(t *testing.T) {
+	ResetAssetsCache()
+	defer ResetAssetsCache()
+
+	// Mock typst that fails while emitting the short one-line-per-diagnostic
+	// format (file:line:col: error: message), as typst does with
+	// --diagnostic-format short.
+	binDir := t.TempDir()
+	script := "#!/bin/sh\n" +
+		"echo '/main.typ:1:1: error: unknown variable: foo' >&2\n" +
+		"echo '/main.typ:4:2: error: unclosed delimiter' >&2\n" +
+		"exit 1\n"
+	if err := os.WriteFile(filepath.Join(binDir, "typst"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	eng := EngineInfo{
+		Available: true,
+		Path:      filepath.Join(binDir, "typst"),
+		Version:   "0.15.0",
+	}
+	job := baseTestJob(t.TempDir())
+	job.shortDiagnostics = true
+
+	_, err := renderTypst(context.Background(), eng, job)
+	if err == nil {
+		t.Fatal("expected error from failing typst")
+	}
+	re, ok := err.(*RenderError)
+	if !ok {
+		t.Fatalf("want *RenderError, got %T: %v", err, err)
+	}
+
+	// Every line of the machine-facing detail keeps the compact shape.
+	lines := strings.Split(strings.TrimSpace(re.Detail), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 diagnostic lines, got %d: %q", len(lines), re.Detail)
+	}
+	for _, ln := range lines {
+		if !shortDiagnosticLine.MatchString(ln) {
+			t.Errorf("diagnostic line not in compact file:line:col: error: message shape: %q", ln)
+		}
+	}
+}
+
+var shortDiagnosticLine = regexp.MustCompile(`^\S+:\d+:\d+: (error|warning): .+`)
+
+func TestCleanTypstErrorTruncatesShortDiagnostics(t *testing.T) {
+	// Backstop: even a flood of short diagnostics is truncated by
+	// cleanTypstError, keeping RenderError.Detail bounded.
+	var b strings.Builder
+	for i := 1; i <= 100; i++ {
+		fmt.Fprintf(&b, "/main.typ:%d:1: error: synthetic failure %d\n", i, i)
+	}
+	got := cleanTypstError(b.String())
+	lines := strings.Split(got, "\n")
+	if len(lines) != 41 { // 40 kept + truncation marker
+		t.Fatalf("expected 41 lines after truncation, got %d", len(lines))
+	}
+	if !strings.HasSuffix(got, "  … (truncated)") {
+		t.Errorf("missing truncation marker, tail: %q", lines[len(lines)-1])
+	}
+	if !shortDiagnosticLine.MatchString(lines[0]) {
+		t.Errorf("first kept line lost compact shape: %q", lines[0])
 	}
 }

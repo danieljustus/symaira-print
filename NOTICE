@@ -11,10 +11,10 @@ symprint shells out to the Typst typesetting engine. Typst is NOT distributed
 with this software; users install it themselves. Typst is licensed under the
 Apache License 2.0 — https://github.com/typst/typst
 
-On first render the Typst engine fetches the following Typst Universe package
-into its own package cache (network required once; Phase 2 will vendor it):
+The following Typst Universe package is vendored into this software
+(embedded via go:embed, materialized per render — no network required):
 
-  @preview/cmarker  — CommonMark → Typst, MIT — https://github.com/SabrinaJewson/cmarker.typ
+  @preview/cmarker 0.1.9  — CommonMark → Typst, MIT — https://github.com/SabrinaJewson/cmarker.typ
 
 The DIN 5008 letter geometry is informed by these open-source templates
 (consulted as references; see docs/architecture.md):
