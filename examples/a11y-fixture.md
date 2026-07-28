@@ -40,7 +40,10 @@ Validator auch auswerten kann.
 
 - Überschriftenhierarchie über mehrere Ebenen (H1 → H2 → H3)
 - Tabellen mit Kopfzeile
+- Bilder mit Alternativtext (wird an `image(alt:)` weitergereicht)
 - Dokumentensprache und -titel (bereits abgedeckt)
+
+![Beispielhafte blaue Beispielgrafik mit weißem Rahmen](logo-example.png)
 
 ## Bewertung
 

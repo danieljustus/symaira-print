@@ -32,7 +32,7 @@ Validated documents and the constructs they exercise:
 |---|---|---|
 | `examples/behoerde.md` | behoerde | prose, lists, level-1 headings, `lang`/`title` metadata |
 | `examples/meeting.md` | meeting | prose, lists, task lists, level-1 headings, `lang`/`title` |
-| `examples/a11y-fixture.md` | behoerde | multi-level non-skipping heading hierarchy (H1→H2→H3), table with header row |
+| `examples/a11y-fixture.md` | behoerde | multi-level non-skipping heading hierarchy (H1→H2→H3), table with header row, image with alt text |
 
 The `a11y-fixture` was added because the gate previously passed **vacuously**:
 the validated fixtures contained no tables, no images and no multi-level
@@ -42,11 +42,6 @@ tracked as an issue — never silenced.
 
 ## Explicitly NOT covered
 
-- **Images with alt text.** `symprint` renders in a temporary engine root and
-  does not copy assets from the source document's directory, so a relative
-  reference like `![alt](logo.png)` cannot resolve and the render fails. This
-  is a known product limitation (asset-path handling), not a CI gap that can
-  be closed by adding an image to a fixture today.
 - **Math.** No example or fixture contains math markup; PDF/UA-1 behavior for
   equations is unverified.
 - **Cross-platform font fallback.** CI always ignores system fonts, so results

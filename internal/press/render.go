@@ -18,6 +18,11 @@ type EngineConfig struct {
 type Request struct {
 	Source     []byte
 	SourceName string // for diagnostics only
+	// SourceDir is the directory of the input document; locally referenced
+	// Markdown images are resolved against it and copied into the render work
+	// dir. Empty for inputs without a filesystem base (e.g. MCP) — local image
+	// references then fail with a clear error instead of an engine error.
+	SourceDir  string
 	OutputPath string
 
 	// Overrides (CLI/MCP flags) win over frontmatter and profile defaults.
@@ -125,6 +130,7 @@ func Render(ctx context.Context, req Request) (*Result, error) {
 		profile:          prof,
 		front:            doc.Front,
 		body:             doc.Body,
+		sourceDir:        req.SourceDir,
 		outputPath:       req.OutputPath,
 		pdfStandard:      std,
 		reproducible:     repro,
