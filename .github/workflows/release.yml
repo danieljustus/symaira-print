@@ -34,6 +34,8 @@ jobs:
   release-client:
     needs: [goreleaser]
     runs-on: macos-15
+    env:
+      DEVELOPER_ID: "Developer ID Application: Daniel Justus (M4744F3TAA)"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -50,14 +52,73 @@ jobs:
       - name: Build Go Engine
         run: make build
 
+      - name: Import Developer ID Certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          echo "$CERTIFICATE_P12" | base64 -d > /tmp/cert.p12
+          security create-keychain -p ci-build build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p ci-build build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci-build build.keychain
+          rm /tmp/cert.p12
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | sed 's/"//g')
+
       - name: Generate Xcode Project
         run: make client-gen
 
-      - name: Build macOS App
-        run: make client-build
+      - name: Build macOS App (unsigned)
+        run: |
+          xcodebuild -project client/Symprint.xcodeproj \
+            -scheme Symprint \
+            -configuration Release \
+            -derivedDataPath client/build \
+            CODE_SIGN_IDENTITY="$DEVELOPER_ID" \
+            OTHER_CODE_SIGN_FLAGS="--options runtime --timestamp" \
+            CODE_SIGN_STYLE=Manual \
+            build 2>&1 | tail -20
+
+      - name: Sign embedded symprint binary
+        run: |
+          BIN="client/build/Build/Products/Release/Symprint.app/Contents/Resources/symprint"
+          if [ -f "$BIN" ]; then
+            codesign --force --sign "$DEVELOPER_ID" \
+              --options runtime --timestamp "$BIN"
+          fi
+
+      - name: Re-sign app bundle
+        run: |
+          APP="client/build/Build/Products/Release/Symprint.app"
+          codesign --deep --force --verify --verbose \
+            --sign "$DEVELOPER_ID" \
+            --entitlements client/Symprint.entitlements \
+            --options runtime --timestamp "$APP"
+          codesign --verify --deep --strict --verbose=1 "$APP"
 
       - name: Package DMG Installer
-        run: make client-dmg
+        run: |
+          ./scripts/package-dmg.sh client/build/Build/Products/Release/Symprint.app dist/Symprint.dmg
+
+      - name: Notarize DMG
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER: ${{ secrets.NOTARY_API_ISSUER }}
+        run: |
+          echo "$NOTARY_API_KEY" | base64 -d > /tmp/notary.p8
+          xcrun notarytool submit dist/Symprint.dmg \
+            --key /tmp/notary.p8 \
+            --key-id "$NOTARY_API_KEY_ID" \
+            --issuer "$NOTARY_API_ISSUER" \
+            --wait --timeout 20m
+          rm /tmp/notary.p8
+
+      - name: Staple Notarization Ticket
+        run: |
+          xcrun stapler staple dist/Symprint.dmg
+          xcrun stapler validate dist/Symprint.dmg
 
       - name: Upload DMG to Release
         env:
