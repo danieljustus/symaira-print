@@ -75,16 +75,24 @@ jobs:
           typst-version: '0.15.0'
       - name: Build
         run: CGO_ENABLED=0 go build -o symprint ./cmd/symprint
+      # Renders every examples/*.md, including the accessibility fixture
+      # validated by veraPDF below.
       - name: Render examples
         run: |
-          for name in report behoerde brief meeting rechnung; do
-            ./symprint render "examples/${name}.md" -o "/tmp/${name}.pdf"
+          for src in examples/*.md; do
+            name=$(basename "$src" .md)
+            ./symprint render "$src" -o "/tmp/${name}.pdf"
           done
           file /tmp/*.pdf
 
+      # Standards gate. Coverage note (see docs/ci-coverage.md):
+      #  - behoerde/meeting: prose documents — headings, lists, lang/title.
+      #  - a11y-fixture: multi-level non-skipping heading hierarchy (H1-H3)
+      #    and a table with header row. Images/alt-text are NOT covered: the
+      #    engine root is a temp dir, so relative image paths cannot resolve.
       - name: Validate PDF/A-2a and PDF/UA-1 (veraPDF)
         run: |
-          for profile in behoerde meeting; do
+          for profile in behoerde meeting a11y-fixture; do
             echo "Validating PDF/A-2a for ${profile}.pdf..."
             docker run --rm -v "/tmp:/data" verapdf/cli \
               -f 2a --format text "/data/${profile}.pdf" \
