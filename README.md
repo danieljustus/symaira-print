@@ -185,6 +185,20 @@ Markdown + frontmatter ─▶ internal/press ─▶ Typst (PATH) ─▶ PDF
 Design rationale, the engine decision (Typst vs pandoc/LaTeX vs CSS), and the
 phased roadmap are in **[docs/architecture.md](docs/architecture.md)**.
 
+## macOS client
+
+A native SwiftUI GUI lives in [`client/`](client/), built on the shared
+`symaira-appkit` package. It wraps the `symprint` binary (via
+`SymairaCLIRunner`) for a point-and-click render flow.
+
+```bash
+make client-gen    # xcodegen generate (needs xcodegen)
+make client-build  # xcodebuild the Symprint scheme
+make client-dmg    # package a .dmg (scripts/package-dmg.sh)
+```
+
+See [`AGENTS.md`](AGENTS.md#macos-client-client) for the client's conventions.
+
 ## Development
 
 ```bash
