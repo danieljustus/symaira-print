@@ -32,17 +32,21 @@ Validated documents and the constructs they exercise:
 |---|---|---|
 | `examples/behoerde.md` | behoerde | prose, lists, level-1 headings, `lang`/`title` metadata |
 | `examples/meeting.md` | meeting | prose, lists, task lists, level-1 headings, `lang`/`title` |
-| `examples/a11y-fixture.md` | behoerde | multi-level non-skipping heading hierarchy (H1→H2→H3), table with header row, image with alt text |
+| `examples/a11y-fixture.md` | behoerde | multi-level non-skipping heading hierarchy (H1→H2→H3), table with header row, image with alt text, inline and block math with LaTeX source alt text |
 
 The `a11y-fixture` was added because the gate previously passed **vacuously**:
-the validated fixtures contained no tables, no images and no multi-level
-heading structure, so large parts of the PDF/UA-1 rule set were never
+the validated fixtures contained no tables, no images, no multi-level
+heading structure or equations, so large parts of the PDF/UA-1 rule set were never
 exercised. A veraPDF failure on this fixture is a real finding and must be
 tracked as an issue — never silenced.
 
+For equations, cmarker delegates Markdown math to the vendored
+`@preview/mitex:0.2.7` package. The callback passes the original LaTeX/source
+string as `alt` for both inline and block equations; the source is intentionally
+kept non-empty and bounded by the equation itself so Typst emits accessible
+PDF/UA alternate text rather than failing closed on an untagged equation.
+
 ## Explicitly NOT covered
 
-- **Math.** No example or fixture contains math markup; PDF/UA-1 behavior for
-  equations is unverified.
-- **Cross-platform font fallback.** CI always ignores system fonts, so results
-  say nothing about rendering on machines where users opt into system fonts.
+- **Cross-platform font fallback.** CI always ignores system fonts, so results say
+  nothing about rendering on machines where users opt into system fonts.

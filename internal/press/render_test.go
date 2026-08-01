@@ -22,10 +22,12 @@ func TestMainTyp(t *testing.T) {
 			template: "brief.typ",
 			want: []string{
 				"#import \"@preview/cmarker:0.1.9\"",
+				"#import \"@preview/mitex:0.2.7\": mitex",
 				"#import \"/templates/brief.typ\" as profile",
 				"#let meta = json(\"/meta.json\")",
 				"#show: profile.apply.with(meta)",
 				"#cmarker.render(read(\"/body.md\")",
+				"math: (source, block: false) => mitex(source, block: block, alt: source)",
 			},
 		},
 		{

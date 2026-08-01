@@ -29,7 +29,15 @@ Validierung der Barrierefreiheit. Es enthält bewusst Merkmale, die in den
 
 Die bisher validierten Beispieldokumente enthalten weder Tabellen noch eine
 mehrstufige Überschriftenstruktur. Die PDF/UA-1-Prüfung in der CI konnte
-dadurch bestanden werden, ohne diese Konstrukte tatsächlich zu prüfen.
+dadurch bestanden werden, ohne diese Konstrukte tatsächlich zu prüfen. Die
+folgende Inline-Gleichung prüft die barrierefreie Ausgabe eines kurzen Ausdrucks:
+$E = m c^2$.
+
+Der Block testet zusätzlich eine mehrgliedrige LaTeX-Gleichung:
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
 
 ## Feststellung
 
@@ -41,6 +49,7 @@ Validator auch auswerten kann.
 - Überschriftenhierarchie über mehrere Ebenen (H1 → H2 → H3)
 - Tabellen mit Kopfzeile
 - Bilder mit Alternativtext (wird an `image(alt:)` weitergereicht)
+- Inline- und Block-Mathematik (LaTeX-Quelle wird als PDF/UA-Alternativtext gesetzt)
 - Dokumentensprache und -titel (bereits abgedeckt)
 
 ![Beispielhafte blaue Beispielgrafik mit weißem Rahmen](logo-example.png)
