@@ -18,12 +18,12 @@ var fsys embed.FS
 var fontFS embed.FS
 
 // packagesFS embeds vendored Typst packages so every render works offline.
-// Currently holds @preview/cmarker:0.1.9 (MIT license; see NOTICE). The
-// directory layout mirrors the Typst package layout
+// Currently holds @preview/cmarker:0.1.9 (MIT) and @preview/mitex:0.2.7
+// (Apache-2.0; see the package LICENSE files and NOTICE). The directory layout mirrors the Typst package layout
 // (packages/{namespace}/{name}/{version}/) so the materialized tree can be
 // passed to typst via --package-path.
 //
-//go:embed packages/preview/cmarker/0.1.9/*
+//go:embed packages/preview/cmarker/0.1.9/* packages/preview/mitex/0.2.7 packages/preview/mitex/0.2.7/specs/* packages/preview/mitex/0.2.7/specs/latex/*
 var packagesFS embed.FS
 
 // PackagesFS exposes the embedded vendored-package tree for regression tests
