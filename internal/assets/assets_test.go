@@ -40,6 +40,34 @@ func TestVendoredCmarkerEmbedded(t *testing.T) {
 	}
 }
 
+// TestVendoredMitexEmbedded guards the complete offline mitex package,
+// including the WASM plugin and its Typst support files.
+func TestVendoredMitexEmbedded(t *testing.T) {
+	fsys := PackagesFS()
+	base := "packages/preview/mitex/0.2.7"
+
+	toml, err := fsys.ReadFile(base + "/typst.toml")
+	if err != nil {
+		t.Fatalf("embedded mitex typst.toml missing: %v", err)
+	}
+	if !strings.Contains(string(toml), `version = "0.2.7"`) {
+		t.Errorf("typst.toml does not pin mitex 0.2.7, got:\n%s", toml)
+	}
+	if !strings.Contains(string(toml), `license = "Apache-2.0"`) {
+		t.Errorf("typst.toml does not declare Apache-2.0, got:\n%s", toml)
+	}
+
+	for _, name := range []string{"LICENSE", "lib.typ", "mitex.typ", "mitex.wasm", "specs/mod.typ", "specs/prelude.typ", "specs/latex/standard.typ"} {
+		data, err := fsys.ReadFile(base + "/" + name)
+		if err != nil {
+			t.Fatalf("embedded mitex %s missing: %v", name, err)
+		}
+		if len(data) == 0 {
+			t.Fatalf("embedded mitex %s is empty", name)
+		}
+	}
+}
+
 // TestMaterializePackages verifies the on-disk layout mirrors the Typst
 // package layout (packages/{namespace}/{name}/{version}/) so the tree can be
 // passed to typst via --package-path.
@@ -49,15 +77,29 @@ func TestMaterializePackages(t *testing.T) {
 		t.Fatalf("MaterializePackages failed: %v", err)
 	}
 
-	base := filepath.Join(dir, "packages", "preview", "cmarker", "0.1.9")
-	for _, name := range []string{"typst.toml", "lib.typ", "plugin.wasm"} {
-		fi, err := os.Stat(filepath.Join(base, name))
-		if err != nil {
-			t.Errorf("materialized file %s missing: %v", name, err)
-			continue
-		}
-		if fi.Size() == 0 {
-			t.Errorf("materialized file %s is empty", name)
+	for _, pkg := range []struct {
+		name  string
+		files []string
+	}{
+		{
+			name:  "cmarker",
+			files: []string{"typst.toml", "lib.typ", "plugin.wasm"},
+		},
+		{
+			name:  "mitex",
+			files: []string{"typst.toml", "lib.typ", "mitex.typ", "mitex.wasm", "LICENSE", "specs/mod.typ", "specs/latex/standard.typ"},
+		},
+	} {
+		base := filepath.Join(dir, "packages", "preview", pkg.name, map[string]string{"cmarker": "0.1.9", "mitex": "0.2.7"}[pkg.name])
+		for _, name := range pkg.files {
+			fi, err := os.Stat(filepath.Join(base, name))
+			if err != nil {
+				t.Errorf("materialized %s file %s missing: %v", pkg.name, name, err)
+				continue
+			}
+			if fi.Size() == 0 {
+				t.Errorf("materialized %s file %s is empty", pkg.name, name)
+			}
 		}
 	}
 }
