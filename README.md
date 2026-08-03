@@ -5,6 +5,8 @@
 [![Go](https://img.shields.io/github/go-mod/go-version/danieljustus/symaira-print)](go.mod)
 [![Release](https://img.shields.io/github/v/release/danieljustus/symaira-print)](https://github.com/danieljustus/symaira-print/releases/latest)
 
+![Symaira Print social preview](docs/assets/social-preview.png)
+
 Turn **Markdown into beautiful PDFs** via named use-case profiles — so humans,
 CLIs, and AI agents (MCP) get consistent, predictable output **without the
 pandoc/LaTeX iteration pain**. Binary name: `symprint`. Part of the Symaira
