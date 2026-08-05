@@ -54,7 +54,7 @@ $ symprint validate report.md
 
 ## Status
 
-This is an early **scaffold** (v0.3.0). What works today, verified
+This is an early **scaffold** (v0.4.0). What works today, verified
 end-to-end against Typst 0.15.0:
 
 - The full Go pipeline: strict frontmatter contract, profile registry,
