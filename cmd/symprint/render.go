@@ -20,6 +20,7 @@ func newRenderCmd() *cobra.Command {
 		fontPath     string
 		reproducible bool
 		reproSet     bool
+		overwrite    bool
 	)
 
 	cmd := &cobra.Command{
@@ -30,6 +31,9 @@ func newRenderCmd() *cobra.Command {
 The profile is chosen from the frontmatter (profile:) or --profile. Output
 defaults to the input name with a .pdf extension. Precedence (low → high):
 config defaults < profile < frontmatter < CLI flags.
+
+An existing PDF output is replaced normally; an existing non-PDF file at the
+output path is only overwritten with --overwrite.
 
 Examples:
   symprint render brief.md
@@ -51,6 +55,13 @@ Examples:
 			out := output
 			if out == "" {
 				out = strings.TrimSuffix(args[0], filepath.Ext(args[0])) + ".pdf"
+			}
+
+			// Fail closed on existing non-PDF output and directories, matching the
+			// MCP overwrite guard: only explicit --overwrite bypasses the refusal.
+			// Existing PDF outputs keep their normal replace-without-flag behavior.
+			if err := press.CheckOverwrite(out, overwrite); err != nil {
+				return exitcodes.Wrap(err, exitcodes.ExitConflict, exitcodes.KindConflict, "output")
 			}
 
 			req := press.Request{
@@ -96,6 +107,7 @@ Examples:
 	cmd.Flags().StringVar(&standard, "pdf-standard", "", "comma-separated typst --pdf-standard (e.g. a-2a,ua-1)")
 	cmd.Flags().StringVar(&fontPath, "font-path", "", "extra font directory (typst --font-path); embedded fonts always included")
 	cmd.Flags().BoolVar(&reproducible, "reproducible", false, "export SOURCE_DATE_EPOCH for byte-stable output")
+	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "allow overwriting an existing non-PDF file at the output path")
 	cmd.PreRun = func(cmd *cobra.Command, _ []string) {
 		reproSet = cmd.Flags().Changed("reproducible")
 	}
