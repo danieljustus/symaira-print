@@ -66,6 +66,10 @@ end-to-end against Typst 0.15.0:
   (`pdfaid` + `pdfuaid` + `StructTreeRoot` present).
 - DIN 5008 letter geometry validated against KOMA-Script (LPPL) source values.
 - `veraPDF` CI gating validates PDF/A-2a + PDF/UA-1 conformance on every push/PR.
+- `$...$` / `$$...$$` **LaTeX math** renders fully offline via the vendored
+  `@preview/mitex` 0.2.7 package — no network access or TeX installation
+  needed; equations in PDF/UA-1 output carry their LaTeX source as non-empty
+  alt text.
 - Brand fonts (Inter) embedded via `go:embed` for machine-independent output.
 
 What is **not** done yet (see [docs/architecture.md](docs/architecture.md)):
@@ -89,7 +93,7 @@ brew install typst      # macOS
 ./symprint doctor       # checks typst + optional tools
 ```
 
-After the first release, install via Go or Homebrew:
+Install via Go or Homebrew:
 
 ```bash
 go install github.com/danieljustus/symaira-print/cmd/symprint@latest
@@ -150,6 +154,9 @@ Global `--json` emits machine-readable output where supported.
 
 Full reference: [docs/profiles.md](docs/profiles.md) ·
 contract: [docs/markdown-contract.md](docs/markdown-contract.md).
+
+PDF/UA-1 profiles (`behoerde`, `meeting`) tag math equations with their LaTeX
+source as alt text, so formulas stay readable to screen readers.
 
 ## For AI agents (MCP)
 
