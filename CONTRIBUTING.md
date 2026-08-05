@@ -44,5 +44,12 @@ the changelog clean.
 
 Use **squash merge** when merging a pull request. It keeps `main` history one
 commit per change, regardless of how many fixup commits a PR went through.
-Merge commits and rebase merges are also enabled on this repository for
-flexibility, but squash is the convention.
+Squash merge is the only merge method enabled on this repository — merge
+commits and rebase merges are disabled.
+
+## Branch protection
+
+`main` is protected: the required status checks `build-and-test` and
+`render-smoke` must pass, and linear history is required via squash-only
+merges. Admin bypass (`enforce_admins`) is intentionally kept enabled while
+the repository is solo-maintained; revisit it when a second maintainer joins.
