@@ -1,6 +1,9 @@
 package assets
 
 import (
+	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,5 +104,135 @@ func TestMaterializePackages(t *testing.T) {
 				t.Errorf("materialized %s file %s is empty", pkg.name, name)
 			}
 		}
+	}
+}
+
+// TestMaterialize writes every embedded Typst template into a target dir and
+// asserts byte equality with the embedded content. The template list is
+// derived from the embed itself so newly added templates are covered
+// automatically.
+func TestMaterialize(t *testing.T) {
+	names, err := fs.Glob(fsys, "templates/*.typ")
+	if err != nil {
+		t.Fatalf("listing embedded templates: %v", err)
+	}
+	if len(names) == 0 {
+		t.Fatal("no embedded templates found")
+	}
+
+	// Nested, non-existent target exercises the MkdirAll path.
+	dir := filepath.Join(t.TempDir(), "templates")
+	if err := Materialize(dir); err != nil {
+		t.Fatalf("Materialize(%q) failed: %v", dir, err)
+	}
+
+	for _, name := range names {
+		t.Run(filepath.Base(name), func(t *testing.T) {
+			want, err := fsys.ReadFile(name)
+			if err != nil {
+				t.Fatalf("reading embedded %s: %v", name, err)
+			}
+			got, err := os.ReadFile(filepath.Join(dir, filepath.Base(name)))
+			if err != nil {
+				t.Fatalf("materialized template %s missing: %v", filepath.Base(name), err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Errorf("materialized %s differs from embedded content: got %d bytes, want %d bytes",
+					filepath.Base(name), len(got), len(want))
+			}
+		})
+	}
+}
+
+// TestMaterializeFonts writes every embedded brand font into a target dir,
+// asserts the returned dir path, and checks byte equality per file against
+// the embedded content (TTF binaries and the license text).
+func TestMaterializeFonts(t *testing.T) {
+	names, err := fs.Glob(fontFS, "fonts/*")
+	if err != nil {
+		t.Fatalf("listing embedded fonts: %v", err)
+	}
+	if len(names) == 0 {
+		t.Fatal("no embedded fonts found")
+	}
+
+	dir := filepath.Join(t.TempDir(), "fonts")
+	gotDir, err := MaterializeFonts(dir)
+	if err != nil {
+		t.Fatalf("MaterializeFonts(%q) failed: %v", dir, err)
+	}
+	if gotDir != dir {
+		t.Errorf("MaterializeFonts returned %q, want %q", gotDir, dir)
+	}
+
+	for _, name := range names {
+		t.Run(filepath.Base(name), func(t *testing.T) {
+			want, err := fontFS.ReadFile(name)
+			if err != nil {
+				t.Fatalf("reading embedded %s: %v", name, err)
+			}
+			got, err := os.ReadFile(filepath.Join(dir, filepath.Base(name)))
+			if err != nil {
+				t.Fatalf("materialized font %s missing: %v", filepath.Base(name), err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Errorf("materialized %s differs from embedded content: got %d bytes, want %d bytes",
+					filepath.Base(name), len(got), len(want))
+			}
+		})
+	}
+}
+
+// TestMaterializePackagesErrors exercises the MaterializePackages error paths:
+// the underlying OS error from a failed mkdir/write must be propagated as-is,
+// not swallowed.
+func TestMaterializePackagesErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		target     func(t *testing.T) string
+		skipAsRoot bool // permission-based case: not exercisable when running as root
+	}{
+		{
+			name: "target nested under a regular file",
+			target: func(t *testing.T) string {
+				blocker := filepath.Join(t.TempDir(), "blocker")
+				if err := os.WriteFile(blocker, []byte("x"), 0o644); err != nil {
+					t.Fatalf("creating blocker file: %v", err)
+				}
+				return filepath.Join(blocker, "out")
+			},
+		},
+		{
+			name:       "read-only target dir",
+			skipAsRoot: true,
+			target: func(t *testing.T) string {
+				dir := t.TempDir()
+				if err := os.Chmod(dir, 0o555); err != nil {
+					t.Fatalf("chmod target dir: %v", err)
+				}
+				t.Cleanup(func() {
+					if err := os.Chmod(dir, 0o755); err != nil {
+						t.Errorf("restoring target dir permissions: %v", err)
+					}
+				})
+				return dir
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.skipAsRoot && os.Geteuid() == 0 {
+				t.Skip("permission-based error path is not exercisable as root")
+			}
+			err := MaterializePackages(tt.target(t))
+			if err == nil {
+				t.Fatal("MaterializePackages succeeded, want error")
+			}
+			var pathErr *os.PathError
+			if !errors.As(err, &pathErr) {
+				t.Errorf("expected propagated *os.PathError, got %T: %v", err, err)
+			}
+		})
 	}
 }
