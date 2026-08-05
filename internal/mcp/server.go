@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,11 +33,23 @@ func toJSON(v any) (string, error) {
 
 // StartServer runs the MCP stdio server backed by the given config.
 func StartServer(ctx context.Context, cfg *config.Config) error {
+	warnOnEmptyOutputRoot(os.Stderr, cfg)
 	s := buildServer(cfg)
 	if err := s.ServeStdio(ctx); err != nil {
 		return fmt.Errorf("mcp server: %w", err)
 	}
 	return nil
+}
+
+// warnOnEmptyOutputRoot prints a one-line notice to w when MCP.OutputRoot is
+// unset. Containment is opt-in: with no output_root the render_pdf tool
+// accepts any absolute output path, so operators must be told at startup. The
+// stdio transport carries only JSON-RPC on stdout, so the notice always goes
+// to stderr (os.Stderr in production).
+func warnOnEmptyOutputRoot(w io.Writer, cfg *config.Config) {
+	if cfg.MCP.OutputRoot == "" {
+		fmt.Fprintln(w, "warning: mcp.output_root is not set; render_pdf output_path is not confined to a root directory - set [mcp] output_root (see 'symprint config init') to confine outputs")
+	}
 }
 
 func buildServer(cfg *config.Config) *mcpserver.Server {
@@ -168,7 +181,7 @@ func buildServer(cfg *config.Config) *mcpserver.Server {
 			if err := checkContainment(args.OutputPath, cfg.MCP.OutputRoot); err != nil {
 				return nil, err
 			}
-			if err := checkOverwrite(args.OutputPath, args.Overwrite); err != nil {
+			if err := press.CheckOverwrite(args.OutputPath, args.Overwrite); err != nil {
 				return nil, err
 			}
 			req := press.Request{
@@ -241,45 +254,4 @@ func checkContainment(outputPath string, outputRoot string) error {
 	}
 
 	return nil
-}
-
-func checkOverwrite(path string, overwrite bool) error {
-	fi, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		return nil
-	}
-	if fi.IsDir() {
-		return fmt.Errorf("output path %q is a directory", path)
-	}
-
-	isPDF, err := hasPDFHeader(path)
-	if err != nil {
-		return fmt.Errorf("could not read existing file: %w", err)
-	}
-
-	if !isPDF && !overwrite {
-		return fmt.Errorf("refusing to overwrite existing non-PDF file %q; pass overwrite=true to force", path)
-	}
-	return nil
-}
-
-func hasPDFHeader(path string) (bool, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
-	buf := make([]byte, 4)
-	n, err := f.Read(buf)
-	if err != nil {
-		return false, nil
-	}
-	if n < 4 {
-		return false, nil
-	}
-	return string(buf) == "%PDF", nil
 }

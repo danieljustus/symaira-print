@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -723,5 +724,146 @@ func TestBuildServer_RenderPDF_OverwriteProtection(t *testing.T) {
 				t.Errorf("expected existing PDF to be overwriteable with overwrite=false, but failed: %s", msg)
 			}
 		}
+	}
+}
+
+// captureFD redirects *fd (os.Stdout or os.Stderr) to a pipe for the duration
+// of fn and returns everything written to it.
+func captureFD(t *testing.T, fd **os.File, fn func()) string {
+	t.Helper()
+	orig := *fd
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+	*fd = w
+	defer func() {
+		*fd = orig
+		w.Close()
+	}()
+	fn()
+	w.Close()
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read pipe: %v", err)
+	}
+	return string(out)
+}
+
+func TestWarnOnEmptyOutputRoot(t *testing.T) {
+	cfg := config.Default()
+	if cfg.MCP.OutputRoot != "" {
+		t.Fatalf("precondition: Default() MCP.OutputRoot = %q, want empty", cfg.MCP.OutputRoot)
+	}
+
+	var buf bytes.Buffer
+	warnOnEmptyOutputRoot(&buf, cfg)
+	if !strings.Contains(buf.String(), "warning: mcp.output_root is not set") {
+		t.Errorf("warnOnEmptyOutputRoot() = %q, want a one-line warning about the unset output_root", buf.String())
+	}
+
+	buf.Reset()
+	cfg.MCP.OutputRoot = t.TempDir()
+	warnOnEmptyOutputRoot(&buf, cfg)
+	if buf.Len() != 0 {
+		t.Errorf("warnOnEmptyOutputRoot() with explicit root = %q, want no output", buf.String())
+	}
+}
+
+func TestStartServer_WarnsOnStderr_NotStdout(t *testing.T) {
+	cfg := config.Default() // MCP.OutputRoot is empty: startup warning expected.
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+	// One initialize request, then EOF: the server must answer on stdout and
+	// return, with the startup warning on stderr and nothing else on stdout.
+	if _, err := w.WriteString(rpcLine(t, 1, "initialize", map[string]any{})); err != nil {
+		t.Fatalf("write initialize request: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close pipe writer: %v", err)
+	}
+
+	var stdout string
+	stderr := captureFD(t, &os.Stderr, func() {
+		stdout = captureFD(t, &os.Stdout, func() {
+			if err := StartServer(context.Background(), cfg); err != nil {
+				t.Fatalf("StartServer() error = %v", err)
+			}
+		})
+	})
+
+	if !strings.Contains(stderr, "warning: mcp.output_root is not set") {
+		t.Errorf("stderr = %q, want a startup warning about the unset output_root", stderr)
+	}
+	if strings.Contains(stdout, "warning") {
+		t.Errorf("warning leaked onto stdout: %q", stdout)
+	}
+	// Zero stdio pollution: every non-empty stdout line is JSON-RPC.
+	for _, line := range strings.Split(strings.TrimSpace(stdout), "\n") {
+		if line == "" {
+			continue
+		}
+		var resp map[string]any
+		if err := json.Unmarshal([]byte(line), &resp); err != nil {
+			t.Errorf("stdout line %q is not JSON-RPC: %v", line, err)
+		}
+	}
+}
+
+func TestStartServer_NoWarningWhenOutputRootSet(t *testing.T) {
+	cfg := config.Default()
+	cfg.MCP.OutputRoot = t.TempDir()
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe() error = %v", err)
+	}
+	origStdin := os.Stdin
+	os.Stdin = r
+	defer func() { os.Stdin = origStdin }()
+	if err := w.Close(); err != nil {
+		t.Fatalf("close pipe writer: %v", err)
+	}
+
+	stderr := captureFD(t, &os.Stderr, func() {
+		if err := StartServer(context.Background(), cfg); err != nil {
+			t.Fatalf("StartServer() error = %v", err)
+		}
+	})
+	if strings.Contains(stderr, "output_root") {
+		t.Errorf("stderr = %q, want no output_root warning when the root is set", stderr)
+	}
+}
+
+func TestCheckContainment_EmptyRootAllowsAnyPath(t *testing.T) {
+	// Containment is opt-in: with no output_root configured, any absolute
+	// output path is allowed and the startup warning is the only mitigation.
+	if err := checkContainment("/some/absolute/path/out.pdf", ""); err != nil {
+		t.Errorf("checkContainment() with empty root error = %v, want nil", err)
+	}
+}
+
+func TestCheckContainment_ExplicitRootEnforced(t *testing.T) {
+	tempDir := t.TempDir()
+	allowedRoot := filepath.Join(tempDir, "allowed")
+	if err := os.MkdirAll(allowedRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	if err := checkContainment(filepath.Join(allowedRoot, "out.pdf"), allowedRoot); err != nil {
+		t.Errorf("inside root: error = %v, want nil", err)
+	}
+	err := checkContainment(filepath.Join(tempDir, "outside.pdf"), allowedRoot)
+	if err == nil {
+		t.Fatal("outside root: error = nil, want containment error")
+	}
+	if !strings.Contains(err.Error(), "outside the allowed output root") {
+		t.Errorf("outside root: error = %q, want a mention of containment", err)
 	}
 }
