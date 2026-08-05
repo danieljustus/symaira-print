@@ -24,14 +24,47 @@ const (
 	mitexVersion   = "0.2.7"
 )
 
+// assetsCacheLayoutVersion is bumped whenever the on-disk layout or semantics
+// of the persistent assets cache change, so directories written by an older
+// layout are ignored instead of misread. It is part of the cache directory
+// name, next to the content hash of the embedded assets.
+const assetsCacheLayoutVersion = "v1"
+
+// assetsCompleteMarker is written inside a fully materialized cache directory
+// before it is atomically renamed into place. A versioned directory without
+// this marker is never treated as valid: it is either a partial materialization
+// or a stale leftover, and it is replaced.
+const assetsCompleteMarker = ".complete"
+
+// assetsCacheTempPrefix names in-progress materialization directories inside
+// the cache root. Leftovers from crashed processes are swept after a
+// successful materialization; the prefix keeps the sweep from ever touching
+// foreign directories.
+const assetsCacheTempPrefix = ".symprint-assets-tmp-"
+
+// staleAssetsCacheAge is how old a markerless directory (or a leftover temp
+// directory) must be before it is considered abandoned and safe to delete.
+// Fresh directories are left alone: another process may still be working on
+// them.
+const staleAssetsCacheAge = time.Hour
+
+// userCacheDirFunc returns the user cache directory that hosts the persistent
+// assets cache. It is a variable so tests can redirect the cache into a temp
+// directory or force a lookup failure to exercise the fallback path. It is
+// test-only: production code must not override it.
+var userCacheDirFunc = os.UserCacheDir
+
 var (
 	assetsCacheMu  sync.Mutex
 	assetsCacheDir string
 	assetsCacheErr error
 )
 
-// ResetAssetsCache cleans up the cached directory and resets cache state.
-// It is intended for testing.
+// ResetAssetsCache removes the process's cached assets directory and the
+// persistent versioned cache directory on disk, then resets cache state so the
+// next render re-materializes the embedded assets from scratch. It is intended
+// for testing and is safe to call at any time (including before any
+// initialization).
 func ResetAssetsCache() {
 	assetsCacheMu.Lock()
 	defer assetsCacheMu.Unlock()
@@ -40,8 +73,154 @@ func ResetAssetsCache() {
 		assetsCacheDir = ""
 	}
 	assetsCacheErr = nil
+	if dir, err := persistentAssetsCacheDir(); err == nil {
+		os.RemoveAll(dir)
+	}
 }
 
+// persistentAssetsCacheDir returns the versioned cache directory for the
+// currently embedded assets, e.g.
+// <UserCacheDir>/symprint/assets-v1-<sha256 of all embedded trees>. The name
+// changes automatically whenever templates, fonts or packages change (see
+// assets.VersionKey), so a stale cache generation is never reused. An error
+// means the user cache is unavailable and callers must fall back.
+func persistentAssetsCacheDir() (string, error) {
+	cacheRoot, err := userCacheDirFunc()
+	if err != nil {
+		return "", err
+	}
+	key, err := assets.VersionKey()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cacheRoot, "symprint", "assets-"+assetsCacheLayoutVersion+"-"+key), nil
+}
+
+// assetsCacheComplete reports whether dir is a fully materialized assets cache,
+// i.e. its completion marker exists. Anything else — missing directory, partial
+// materialization, stale leftover — is treated as invalid.
+func assetsCacheComplete(dir string) bool {
+	fi, err := os.Stat(filepath.Join(dir, assetsCompleteMarker))
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// materializeAssets writes the embedded templates, fonts and packages into dir,
+// mirroring the layout renderTypst symlinks into the per-render work dir.
+func materializeAssets(dir string) error {
+	if err := assets.Materialize(filepath.Join(dir, "templates")); err != nil {
+		return err
+	}
+	if _, err := assets.MaterializeFonts(filepath.Join(dir, "fonts")); err != nil {
+		return err
+	}
+	return assets.MaterializePackages(dir)
+}
+
+// sweepStaleAssetsTemps removes abandoned in-progress materialization
+// directories (crash leftovers) from the cache root. It is best-effort and
+// only ever touches directories that are clearly older than any live
+// materialization could be.
+func sweepStaleAssetsTemps(cacheRoot string) {
+	entries, err := os.ReadDir(cacheRoot)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-staleAssetsCacheAge)
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), assetsCacheTempPrefix) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			os.RemoveAll(filepath.Join(cacheRoot, e.Name()))
+		}
+	}
+}
+
+// initializePersistentAssetsCache materializes the embedded assets into the
+// versioned cache directory under the user cache dir. Content is first written
+// into a fresh temp directory inside the cache root; only after every file and
+// the completion marker are in place is the directory atomically renamed into
+// its final name, so a versioned directory is either absent or fully complete.
+// When a concurrent process wins the rename race, the loser detects the
+// winner's completion marker and reuses it. Any failure returns an error so
+// getOrInitializeAssetsCache can fall back to a per-process temp cache.
+func initializePersistentAssetsCache() (string, error) {
+	versionedDir, err := persistentAssetsCacheDir()
+	if err != nil {
+		return "", err
+	}
+	if assetsCacheComplete(versionedDir) {
+		return versionedDir, nil
+	}
+
+	cacheRoot := filepath.Dir(filepath.Dir(versionedDir))
+	// The rename target's parent (…/symprint) must exist before os.Rename.
+	if err := os.MkdirAll(filepath.Dir(versionedDir), 0o755); err != nil {
+		return "", err
+	}
+
+	// The loop handles a stale markerless directory blocking the rename. It is
+	// bounded so a pathological filesystem cannot hang initialization;
+	// exhausting it falls back to the per-process temp cache.
+	for attempt := 0; attempt < 3; attempt++ {
+		if assetsCacheComplete(versionedDir) {
+			// A concurrent process finished first; reuse its directory.
+			return versionedDir, nil
+		}
+
+		tmpDir, err := os.MkdirTemp(cacheRoot, assetsCacheTempPrefix+"*")
+		if err != nil {
+			return "", err
+		}
+		if err := materializeAssets(tmpDir); err != nil {
+			os.RemoveAll(tmpDir)
+			return "", err
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, assetsCompleteMarker), []byte(versionedDir), 0o644); err != nil {
+			os.RemoveAll(tmpDir)
+			return "", err
+		}
+
+		renameErr := os.Rename(tmpDir, versionedDir)
+		if renameErr == nil {
+			sweepStaleAssetsTemps(cacheRoot)
+			return versionedDir, nil
+		}
+		os.RemoveAll(tmpDir)
+
+		if assetsCacheComplete(versionedDir) {
+			// Lost the rename race: the winner's directory is complete.
+			return versionedDir, nil
+		}
+		info, statErr := os.Stat(versionedDir)
+		if statErr != nil {
+			// The rename failed for an unrelated reason (e.g. the cache root
+			// became unwritable): fall back to the per-process temp cache.
+			return "", renameErr
+		}
+		if time.Since(info.ModTime()) < staleAssetsCacheAge {
+			// A fresh markerless directory may belong to a concurrent
+			// initializer with a different protocol: leave it alone and fall
+			// back so rendering still works.
+			return "", fmt.Errorf("assets cache dir %s exists without completion marker", versionedDir)
+		}
+		// An old markerless directory is a stale/partial leftover: drop it
+		// and retry with a fresh materialization.
+		os.RemoveAll(versionedDir)
+	}
+	return "", fmt.Errorf("could not initialize assets cache at %s", versionedDir)
+}
+
+// getOrInitializeAssetsCache returns the process-wide assets cache directory,
+// materializing the embedded templates, fonts and packages into the persistent
+// versioned cache under the user cache dir on first use. When the user cache
+// is unavailable (lookup error, unwritable root, stale leftovers that cannot
+// be replaced), it falls back to a per-process temp directory so rendering
+// still works.
 func getOrInitializeAssetsCache() (string, error) {
 	assetsCacheMu.Lock()
 	defer assetsCacheMu.Unlock()
@@ -52,32 +231,24 @@ func getOrInitializeAssetsCache() (string, error) {
 		return "", assetsCacheErr
 	}
 
-	dir, err := os.MkdirTemp("", "symprint-assets-cache-*")
+	dir, err := initializePersistentAssetsCache()
+	if err == nil {
+		assetsCacheDir = dir
+		return assetsCacheDir, nil
+	}
+
+	// Fallback: the user cache is unavailable or unusable. Keep the historical
+	// per-process temp-dir behavior so a cache problem never fails a render.
+	dir, err = os.MkdirTemp("", "symprint-assets-cache-*")
 	if err != nil {
 		assetsCacheErr = err
 		return "", err
 	}
-
-	tplDir := filepath.Join(dir, "templates")
-	if err := assets.Materialize(tplDir); err != nil {
+	if err := materializeAssets(dir); err != nil {
 		os.RemoveAll(dir)
 		assetsCacheErr = err
 		return "", err
 	}
-
-	fontDir := filepath.Join(dir, "fonts")
-	if _, err := assets.MaterializeFonts(fontDir); err != nil {
-		os.RemoveAll(dir)
-		assetsCacheErr = err
-		return "", err
-	}
-
-	if err := assets.MaterializePackages(dir); err != nil {
-		os.RemoveAll(dir)
-		assetsCacheErr = err
-		return "", err
-	}
-
 	assetsCacheDir = dir
 	return assetsCacheDir, nil
 }
