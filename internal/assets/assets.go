@@ -5,7 +5,10 @@
 package assets
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -29,6 +32,43 @@ var packagesFS embed.FS
 // PackagesFS exposes the embedded vendored-package tree for regression tests
 // and callers that want to read package files directly.
 func PackagesFS() embed.FS { return packagesFS }
+
+// VersionKey returns a deterministic content hash over every embedded tree
+// (templates, fonts and vendored packages), covering both file paths and file
+// contents. It changes whenever any embedded asset changes, so callers can key
+// persistent caches with it without maintaining a hand-bumped version constant
+// that could silently go stale.
+func VersionKey() (string, error) {
+	h := sha256.New()
+	for _, tree := range []struct {
+		name string
+		fsys fs.FS
+	}{
+		{"templates", fsys},
+		{"fonts", fontFS},
+		{"packages", packagesFS},
+	} {
+		h.Write([]byte(tree.name + "\x00"))
+		if err := fs.WalkDir(tree.fsys, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				return nil
+			}
+			b, err := fs.ReadFile(tree.fsys, p)
+			if err != nil {
+				return err
+			}
+			h.Write([]byte(p + "\x00"))
+			h.Write(b)
+			return nil
+		}); err != nil {
+			return "", fmt.Errorf("hash embedded %s tree: %w", tree.name, err)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
 
 // Materialize writes every embedded template into dir as real files so typst
 // can import them (typst resolves imports from the filesystem, not embed.FS).

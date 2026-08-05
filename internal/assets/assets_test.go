@@ -236,3 +236,26 @@ func TestMaterializePackagesErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestVersionKeyDeterministic guards the cache version key: it must be a
+// stable sha256 over the embedded trees so persistent caches keyed on it are
+// invalidated exactly when embedded assets change.
+func TestVersionKeyDeterministic(t *testing.T) {
+	k1, err := VersionKey()
+	if err != nil {
+		t.Fatalf("VersionKey: %v", err)
+	}
+	k2, err := VersionKey()
+	if err != nil {
+		t.Fatalf("VersionKey (second call): %v", err)
+	}
+	if k1 != k2 {
+		t.Errorf("VersionKey must be deterministic, got %q and %q", k1, k2)
+	}
+	if len(k1) != 64 {
+		t.Errorf("expected 64-char sha256 hex, got %d chars: %q", len(k1), k1)
+	}
+	if k1 == "" {
+		t.Fatal("expected non-empty version key")
+	}
+}
