@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,11 +33,23 @@ func toJSON(v any) (string, error) {
 
 // StartServer runs the MCP stdio server backed by the given config.
 func StartServer(ctx context.Context, cfg *config.Config) error {
+	warnOnEmptyOutputRoot(os.Stderr, cfg)
 	s := buildServer(cfg)
 	if err := s.ServeStdio(ctx); err != nil {
 		return fmt.Errorf("mcp server: %w", err)
 	}
 	return nil
+}
+
+// warnOnEmptyOutputRoot prints a one-line notice to w when MCP.OutputRoot is
+// unset. Containment is opt-in: with no output_root the render_pdf tool
+// accepts any absolute output path, so operators must be told at startup. The
+// stdio transport carries only JSON-RPC on stdout, so the notice always goes
+// to stderr (os.Stderr in production).
+func warnOnEmptyOutputRoot(w io.Writer, cfg *config.Config) {
+	if cfg.MCP.OutputRoot == "" {
+		fmt.Fprintln(w, "warning: mcp.output_root is not set; render_pdf output_path is not confined to a root directory - set [mcp] output_root (see 'symprint config init') to confine outputs")
+	}
 }
 
 func buildServer(cfg *config.Config) *mcpserver.Server {
