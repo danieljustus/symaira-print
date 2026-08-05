@@ -259,3 +259,40 @@ func TestVersionKeyDeterministic(t *testing.T) {
 		t.Fatal("expected non-empty version key")
 	}
 }
+
+func TestMaterializeErrors(t *testing.T) {
+	for _, materialize := range []struct {
+		name string
+		fn   func(string) error
+	}{
+		{name: "templates", fn: Materialize},
+		{name: "fonts", fn: func(dir string) error {
+			_, err := MaterializeFonts(dir)
+			return err
+		}},
+	} {
+		t.Run(materialize.name+"/mkdir", func(t *testing.T) {
+			blocker := filepath.Join(t.TempDir(), "file")
+			if err := os.WriteFile(blocker, []byte("blocker"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := materialize.fn(filepath.Join(blocker, "nested")); err == nil {
+				t.Fatal("materializer succeeded below a regular file")
+			}
+		})
+
+		t.Run(materialize.name+"/write", func(t *testing.T) {
+			dir := t.TempDir()
+			file := "brief.typ"
+			if materialize.name == "fonts" {
+				file = "Inter-Regular.ttf"
+			}
+			if err := os.Mkdir(filepath.Join(dir, file), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := materialize.fn(dir); err == nil {
+				t.Fatal("materializer succeeded with a directory at an output file")
+			}
+		})
+	}
+}

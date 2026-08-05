@@ -216,11 +216,8 @@ func initializePersistentAssetsCache() (string, error) {
 }
 
 // getOrInitializeAssetsCache returns the process-wide assets cache directory,
-// materializing the embedded templates, fonts and packages into the persistent
-// versioned cache under the user cache dir on first use. When the user cache
-// is unavailable (lookup error, unwritable root, stale leftovers that cannot
-// be replaced), it falls back to a per-process temp directory so rendering
-// still works.
+// materializing persistent assets when possible and using a per-process temp
+// directory when the user cache is unavailable.
 func getOrInitializeAssetsCache() (string, error) {
 	assetsCacheMu.Lock()
 	defer assetsCacheMu.Unlock()
@@ -234,11 +231,11 @@ func getOrInitializeAssetsCache() (string, error) {
 	dir, err := initializePersistentAssetsCache()
 	if err == nil {
 		assetsCacheDir = dir
-		return assetsCacheDir, nil
+		return dir, nil
 	}
 
-	// Fallback: the user cache is unavailable or unusable. Keep the historical
-	// per-process temp-dir behavior so a cache problem never fails a render.
+	// Keep the historical temp-dir behavior so a cache problem never fails a
+	// render.
 	dir, err = os.MkdirTemp("", "symprint-assets-cache-*")
 	if err != nil {
 		assetsCacheErr = err
@@ -250,7 +247,7 @@ func getOrInitializeAssetsCache() (string, error) {
 		return "", err
 	}
 	assetsCacheDir = dir
-	return assetsCacheDir, nil
+	return dir, nil
 }
 
 type typstJob struct {
