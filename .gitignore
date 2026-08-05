@@ -21,6 +21,9 @@ examples/*.pdf
 # Local agent tooling state
 .omo/
 
+# Linked agent worktrees
+.worktrees/
+
 # Xcode & client build outputs
 client/build/
 client/*.xcodeproj
