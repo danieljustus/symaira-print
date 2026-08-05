@@ -29,6 +29,9 @@ func TestDefault(t *testing.T) {
 	if cfg.Defaults.Reproducible {
 		t.Error("Defaults.Reproducible = true, want false")
 	}
+	if cfg.MCP.OutputRoot != "" {
+		t.Errorf("MCP.OutputRoot = %q, want empty (containment is opt-in; the mcp server warns on startup)", cfg.MCP.OutputRoot)
+	}
 }
 
 func TestEngineTimeout(t *testing.T) {
@@ -158,5 +161,47 @@ profile = "brief"
 	}
 	if cfg.Engine.Typst != "/opt/typst" {
 		t.Errorf("Engine.Typst = %q, want %q (env should win)", cfg.Engine.Typst, "/opt/typst")
+	}
+}
+
+func TestLoad_MCPOutputRoot_FromFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(t.TempDir())
+
+	configDir := filepath.Join(home, ".config", "symprint")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	tomlContent := `[mcp]
+output_root = "/tmp/symprint-out"
+`
+	if err := os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(tomlContent), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	loader.ResetCache()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.MCP.OutputRoot != "/tmp/symprint-out" {
+		t.Errorf("MCP.OutputRoot = %q, want %q (explicit output_root must survive loading)", cfg.MCP.OutputRoot, "/tmp/symprint-out")
+	}
+}
+
+func TestLoad_MCPOutputRoot_EnvOverride(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(t.TempDir())
+	t.Setenv("SYMPRINT_MCP_OUTPUT_ROOT", "/env/symprint-out")
+	loader.ResetCache()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.MCP.OutputRoot != "/env/symprint-out" {
+		t.Errorf("MCP.OutputRoot = %q, want %q (env should win)", cfg.MCP.OutputRoot, "/env/symprint-out")
 	}
 }
