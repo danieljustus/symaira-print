@@ -18,6 +18,9 @@ vendor/
 # Rendered example PDFs
 examples/*.pdf
 
+# App test reports (screenshots may contain unrelated desktop windows)
+docs/app-test/
+
 # Local agent tooling state
 .omo/
 
