@@ -79,6 +79,21 @@ class CliManager {
         return []
     }
     
+    /// Runs the engine's frontmatter contract check and returns the profile
+    /// named in the document's frontmatter (empty when the document declares
+    /// none). Used to preselect the render profile for a picked document.
+    func validate(inputPath: String) async -> ValidateResult? {
+        do {
+            let res = try await executeCommand(arguments: ["validate", inputPath, "--json"])
+            if res.exitCode == 0, let data = res.stdout.data(using: .utf8) {
+                return try JSONDecoder().decode(ValidateResult.self, from: data)
+            }
+        } catch {
+            print("Error executing validate command: \(error)")
+        }
+        return nil
+    }
+    
     func getConfigPath() async -> String {
         do {
             let res = try await executeCommand(arguments: ["config", "path"])

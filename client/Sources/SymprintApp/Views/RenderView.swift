@@ -240,8 +240,24 @@ struct RenderView: View {
         }
         .task {
             profiles = await cliManager.getProfiles()
-            if let first = profiles.first {
-                selectedProfile = first.name
+            // Keep the intended default profile; fall back to the first entry
+            // only when the current selection is absent from the loaded list.
+            if !profiles.contains(where: { $0.name == selectedProfile }) {
+                selectedProfile = profiles.first?.name ?? ""
+            }
+            // Prefer the profile named in a picked document's frontmatter.
+            if !selectedInputPath.isEmpty {
+                await preselectProfile(forInputPath: selectedInputPath)
+            }
+        }
+        .onAppear {
+            if let url = AppState.shared.pendingDocumentURL {
+                loadDocument(at: url)
+            }
+        }
+        .onChange(of: AppState.shared.pendingDocumentURL) { _, newURL in
+            if let newURL {
+                loadDocument(at: newURL)
             }
         }
     }
@@ -298,6 +314,39 @@ struct RenderView: View {
             errorMessage = error.localizedDescription
         }
         isRendering = false
+    }
+    
+    // MARK: - External document handling (Finder "Open With", `open -a`)
+    
+    private static let markdownExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
+    
+    /// Loads a document handed to the app from outside (Finder, Dock, `open -a`),
+    /// preselects the profile named in its frontmatter when present, and renders it.
+    private func loadDocument(at url: URL) {
+        let ext = url.pathExtension.lowercased()
+        guard Self.markdownExtensions.contains(ext) else {
+            errorMessage = "“\(url.lastPathComponent)” is not a Markdown document."
+            return
+        }
+        errorMessage = nil
+        renderResult = nil
+        selectedInputPath = url.path
+        Task {
+            await preselectProfile(forInputPath: url.path)
+            await runRender()
+        }
+    }
+    
+    /// Prefers the profile named in the document's frontmatter over the current
+    /// selection, so documents that declare a profile render correctly by default.
+    private func preselectProfile(forInputPath path: String) async {
+        if profiles.isEmpty {
+            profiles = await cliManager.getProfiles()
+        }
+        guard let result = await cliManager.validate(inputPath: path),
+              !result.profile.isEmpty,
+              profiles.contains(where: { $0.name == result.profile }) else { return }
+        selectedProfile = result.profile
     }
     
     private func colorForLog(_ log: String) -> Color {
