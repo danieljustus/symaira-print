@@ -32,3 +32,8 @@ client/build/
 client/*.xcodeproj
 
 internal/press/--version
+
+# Local review artifacts (gh-audit / 01-code-review / test-coverage)
+.github/audit/
+.github/review/
+.github/coverage/

@@ -1,6 +1,11 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Markdown file extensions the app accepts — for the drop zone and for
+/// external opens. Must match the bundle's UTImportedTypeDeclarations
+/// (client/Sources/SymprintApp/Info.plist).
+private let markdownExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
+
 struct RenderView: View {
     @State private var cliManager = CliManager.shared
     
@@ -20,6 +25,9 @@ struct RenderView: View {
     @State private var errorMessage: String?
     @State private var renderResult: RenderResult?
     @State private var showLogs = true
+    // Set while loadDocument performs its own preselect+render, so the
+    // .onChange(of: selectedInputPath) handler does not run validate twice.
+    @State private var isExternalLoad = false
     
     var body: some View {
         HStack(spacing: 0) {
@@ -268,7 +276,9 @@ struct RenderView: View {
         .onChange(of: selectedInputPath) { _, newPath in
             // A manually picked document may name a profile in its frontmatter;
             // preselect it so the first render uses the right profile.
-            guard !newPath.isEmpty else { return }
+            // External opens are excluded: loadDocument runs its own
+            // preselect+render and would otherwise validate twice.
+            guard !newPath.isEmpty, !isExternalLoad else { return }
             Task { await preselectProfile(forInputPath: newPath) }
         }
     }
@@ -329,22 +339,25 @@ struct RenderView: View {
     
     // MARK: - External document handling (Finder "Open With", `open -a`)
     
-    private static let markdownExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
-    
     /// Loads a document handed to the app from outside (Finder, Dock, `open -a`),
     /// preselects the profile named in its frontmatter when present, and renders it.
     private func loadDocument(at url: URL) {
+        // Consume the event so tab switches do not replay the same open and
+        // re-render a document the user may have replaced manually in between.
+        AppState.shared.consumePendingDocument()
         let ext = url.pathExtension.lowercased()
-        guard Self.markdownExtensions.contains(ext) else {
+        guard markdownExtensions.contains(ext) else {
             errorMessage = "“\(url.lastPathComponent)” is not a Markdown document."
             return
         }
         errorMessage = nil
         renderResult = nil
+        isExternalLoad = true
         selectedInputPath = url.path
         Task {
             await preselectProfile(forInputPath: url.path)
             await runRender()
+            isExternalLoad = false
         }
     }
     
@@ -437,11 +450,10 @@ struct FileDropZone: View {
         .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
             guard let provider = providers.first else { return false }
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                if let url = url {
-                    if url.pathExtension == "md" {
-                        DispatchQueue.main.async {
-                            self.path = url.path
-                        }
+                if let url = url,
+                   markdownExtensions.contains(url.pathExtension.lowercased()) {
+                    DispatchQueue.main.async {
+                        self.path = url.path
                     }
                 }
             }

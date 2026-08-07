@@ -16,4 +16,10 @@ final class AppState {
     func handleOpen(_ url: URL) {
         pendingDocumentURL = url
     }
+
+    /// Consumes the pending open event. Called once the target view has loaded
+    /// the document, so a later tab switch does not replay the same open.
+    func consumePendingDocument() {
+        pendingDocumentURL = nil
+    }
 }
