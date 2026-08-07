@@ -53,6 +53,7 @@ struct RenderView: View {
                             }
                             .labelsHidden()
                             .pickerStyle(.menu)
+                            .accessibilityLabel("Render profile")
                             
                             if let profile = profiles.first(where: { $0.name == selectedProfile }) {
                                 Text(profile.description)
@@ -113,6 +114,8 @@ struct RenderView: View {
                         }
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Theme.textPrimary)
+                        .accessibilityLabel("Advanced Parameters")
+                        .accessibilityHint("Show or hide advanced settings")
                         
                         // Render Button
                         VStack(spacing: 8) {
@@ -137,9 +140,10 @@ struct RenderView: View {
                             .tint(Theme.goldPrimary)
                             .foregroundStyle(Theme.bgDarker)
                             .disabled(selectedInputPath.isEmpty || isRendering)
+                            .accessibilityLabel("Render PDF")
                             
                             if let error = errorMessage {
-                                Text("Error: \(error)")
+                                Text(error)
                                     .font(.caption)
                                     .foregroundStyle(.red)
                                     .multilineTextAlignment(.center)
@@ -179,6 +183,7 @@ struct RenderView: View {
                             .buttonStyle(.plain)
                             .font(.caption2)
                             .foregroundStyle(Theme.textSecondary)
+                            .accessibilityLabel("Clear engine logs")
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 6)
@@ -260,6 +265,12 @@ struct RenderView: View {
                 loadDocument(at: newURL)
             }
         }
+        .onChange(of: selectedInputPath) { _, newPath in
+            // A manually picked document may name a profile in its frontmatter;
+            // preselect it so the first render uses the right profile.
+            guard !newPath.isEmpty else { return }
+            Task { await preselectProfile(forInputPath: newPath) }
+        }
     }
     
     // MARK: - Actions
@@ -311,7 +322,7 @@ struct RenderView: View {
             try? await Task.sleep(for: .milliseconds(50))
             lastRenderedPdfUrl = URL(fileURLWithPath: outPath)
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = Self.stripErrorPrefix(error.localizedDescription)
         }
         isRendering = false
     }
@@ -347,6 +358,16 @@ struct RenderView: View {
               !result.profile.isEmpty,
               profiles.contains(where: { $0.name == result.profile }) else { return }
         selectedProfile = result.profile
+    }
+    
+    /// The engine's stderr already begins with "Error:" on most failure paths;
+    /// strip a leading prefix so the cause is shown exactly once.
+    private static func stripErrorPrefix(_ message: String) -> String {
+        var text = message
+        while text.lowercased().hasPrefix("error:") {
+            text = String(text.dropFirst("error:".count)).trimmingCharacters(in: .whitespaces)
+        }
+        return text
     }
     
     private func colorForLog(_ log: String) -> Color {
@@ -407,6 +428,8 @@ struct FileDropZone: View {
         }
         .buttonStyle(.plain)
         .glassCard(isHovered: isTargeted || !path.isEmpty)
+        .accessibilityLabel(path.isEmpty ? "Choose Markdown document" : "Markdown document: \(URL(fileURLWithPath: path).lastPathComponent)")
+        .accessibilityHint("Drag and drop a Markdown file, or click to browse")
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(isTargeted ? Theme.goldPrimary : Color.clear, lineWidth: 1.5)

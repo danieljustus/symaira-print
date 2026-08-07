@@ -43,6 +43,7 @@ struct ContentView: View {
                             .foregroundStyle(selectedItem == item ? Theme.textPrimary : Theme.textSecondary)
                     }
                     .padding(.vertical, 4)
+                    .accessibilityLabel(item.title)
                 }
             }
             .listStyle(.sidebar)

@@ -177,6 +177,7 @@ struct ProfileDetailPanel: View {
                             .font(.title3)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Close profile details")
                 }
                 
                 Text(profile.description)

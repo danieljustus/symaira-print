@@ -107,6 +107,7 @@ struct ConfigView: View {
                                     RoundedRectangle(cornerRadius: 8)
                                         .stroke(Theme.borderGlass, lineWidth: 1)
                                 )
+                                .accessibilityLabel("Configuration file contents")
                         }
                     }
                 }

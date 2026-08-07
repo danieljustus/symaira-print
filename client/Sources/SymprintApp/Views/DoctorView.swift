@@ -165,6 +165,7 @@ struct DoctorToolCard: View {
                                 .foregroundStyle(Theme.textSecondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Copy install command")
                     }
                 }
             }
