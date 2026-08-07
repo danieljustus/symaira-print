@@ -25,7 +25,11 @@ jobs:
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
           distribution: goreleaser
-          version: latest
+          # Pinned to the binary version used by the last successful release
+          # (v0.4.0, run 30999935597). Bump deliberately as part of
+          # release-readiness checks so build/archive behavior cannot change
+          # silently between release runs.
+          version: "v2.17.1"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
