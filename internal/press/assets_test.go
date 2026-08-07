@@ -126,3 +126,54 @@ func TestCollectAssetsRejectsSymlinkEscape(t *testing.T) {
 		t.Fatal("expected symlink escape outside the source dir to be rejected")
 	}
 }
+
+func TestCopyFileCopiesContents(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "in.png")
+	content := []byte{0x89, 'P', 'N', 'G', 4, 5, 6}
+	writeTestFile(t, src, content)
+
+	dstDir := filepath.Join(t.TempDir(), "out")
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dstDir, "in.png")
+	if err := copyFile(src, dst); err != nil {
+		t.Fatalf("copyFile: %v", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read copied file: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Fatalf("content mismatch: got %q, want %q", got, content)
+	}
+}
+
+func TestCopyFileMissingSource(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "missing.png")
+	dst := filepath.Join(t.TempDir(), "out.png")
+
+	if err := copyFile(src, dst); err == nil {
+		t.Fatal("expected copyFile to fail when the source file does not exist")
+	}
+}
+
+func TestCopyFileDestinationUnwritable(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "in.png")
+	writeTestFile(t, src, []byte("data"))
+
+	cases := map[string]string{
+		// Parent directory missing → OpenFile fails.
+		"missing parent": filepath.Join(dir, "no-such-dir", "out.png"),
+		// Destination is an existing directory → OpenFile fails.
+		"destination is a directory": dir,
+	}
+	for name, dst := range cases {
+		t.Run(name, func(t *testing.T) {
+			if err := copyFile(src, dst); err == nil {
+				t.Fatalf("expected copyFile to fail for %s", name)
+			}
+		})
+	}
+}
