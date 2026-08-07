@@ -290,3 +290,90 @@ func TestResetAssetsCacheRemovesPersistentDir(t *testing.T) {
 		t.Error("expected completion marker after re-init")
 	}
 }
+
+// blockPathWithFile plants a regular file at path so any os.MkdirAll or
+// os.WriteFile targeting it (or a child of it) fails deterministically,
+// regardless of the effective user or filesystem permissions.
+func blockPathWithFile(t *testing.T, path string) {
+	t.Helper()
+	writeTestFile(t, path, []byte("blocker"))
+}
+
+func TestMaterializeAssetsFailsWhenTemplatesPathBlocked(t *testing.T) {
+	// A regular file at <dir>/templates makes os.MkdirAll fail inside
+	// assets.Materialize, exercising the first error branch of
+	// materializeAssets.
+	dir := t.TempDir()
+	blockPathWithFile(t, filepath.Join(dir, "templates"))
+
+	if err := materializeAssets(dir); err == nil {
+		t.Fatal("expected materializeAssets to fail when the templates path is blocked")
+	}
+}
+
+func TestMaterializeAssetsFailsWhenFontsPathBlocked(t *testing.T) {
+	// Templates materialize fine; a regular file at <dir>/fonts makes
+	// assets.MaterializeFonts fail, exercising the second error branch.
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "templates"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	blockPathWithFile(t, filepath.Join(dir, "fonts"))
+
+	if err := materializeAssets(dir); err == nil {
+		t.Fatal("expected materializeAssets to fail when the fonts path is blocked")
+	}
+}
+
+func TestMaterializeAssetsFailsWhenPackagesPathBlocked(t *testing.T) {
+	// Templates and fonts materialize fine; a regular file at <dir>/packages
+	// makes assets.MaterializePackages fail, exercising the third error
+	// branch.
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "templates"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "fonts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	blockPathWithFile(t, filepath.Join(dir, "packages"))
+
+	if err := materializeAssets(dir); err == nil {
+		t.Fatal("expected materializeAssets to fail when the packages path is blocked")
+	}
+}
+
+func TestAssetsCacheFailureIsCached(t *testing.T) {
+	// Both the persistent path (user cache lookup fails) and the per-process
+	// temp fallback (TMPDIR points nowhere) must fail, so the error is
+	// recorded and reused by later calls instead of being retried.
+	origUserCache := userCacheDirFunc
+	userCacheDirFunc = func() (string, error) { return "", os.ErrNotExist }
+	t.Cleanup(func() { userCacheDirFunc = origUserCache })
+
+	// Create the temp dir before breaking TMPDIR: t.TempDir itself uses
+	// os.MkdirTemp and would fail afterwards.
+	missingTmp := filepath.Join(t.TempDir(), "does-not-exist")
+	origTmp, hadTmp := os.LookupEnv("TMPDIR")
+	os.Setenv("TMPDIR", missingTmp)
+	t.Cleanup(func() {
+		if hadTmp {
+			os.Setenv("TMPDIR", origTmp)
+		} else {
+			os.Unsetenv("TMPDIR")
+		}
+	})
+
+	ResetAssetsCache()
+	defer ResetAssetsCache()
+
+	if _, err := getOrInitializeAssetsCache(); err == nil {
+		t.Fatal("expected an error when both the persistent cache and the temp fallback fail")
+	}
+
+	// The failure is cached: a second call must return the same error
+	// without retrying either path.
+	if _, err := getOrInitializeAssetsCache(); err == nil {
+		t.Fatal("expected the cached error to be returned on subsequent calls")
+	}
+}
