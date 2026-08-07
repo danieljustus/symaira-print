@@ -47,17 +47,31 @@ targets:
     postBuildScripts:
       - name: Embed symprint Engine
         script: |
-          # Copy the pre-built symprint binary into Contents/Resources.
-          # Build it first: cd .. && make build
-          SRC="${PROJECT_DIR}/../symprint"
+          # Build the engine from source with the app's marketing version
+          # injected (so the bundled `symprint version` reports a real version,
+          # not "dev"), then embed it into Contents/Resources. Falls back to
+          # copying a pre-built binary when the Go toolchain is unavailable,
+          # and to a warning when neither source nor binary exists.
+          SRC_ROOT="${PROJECT_DIR}/.."
           DST="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources"
-          if [ -f "$SRC" ]; then
-            mkdir -p "$DST"
-            cp "$SRC" "$DST/symprint"
+          mkdir -p "$DST"
+          if command -v go >/dev/null 2>&1; then
+            if (cd "$SRC_ROOT" && CGO_ENABLED=0 go build -ldflags "-s -w -X main.version=${MARKETING_VERSION}" -o "$DST/symprint" ./cmd/symprint); then
+              chmod +x "$DST/symprint"
+              echo "Built and embedded symprint ${MARKETING_VERSION} into $DST/symprint"
+            elif [ -f "$SRC_ROOT/symprint" ]; then
+              cp "$SRC_ROOT/symprint" "$DST/symprint"
+              chmod +x "$DST/symprint"
+              echo "warning: engine build failed — embedded pre-built symprint binary"
+            else
+              echo "warning: engine build failed and no pre-built binary found at $SRC_ROOT/symprint"
+            fi
+          elif [ -f "$SRC_ROOT/symprint" ]; then
+            cp "$SRC_ROOT/symprint" "$DST/symprint"
             chmod +x "$DST/symprint"
-            echo "Embedded symprint binary into $DST/symprint"
+            echo "warning: Go toolchain unavailable — embedded pre-built symprint binary"
           else
-            echo "warning: symprint binary not found at $SRC — run 'make build' first"
+            echo "warning: symprint binary not found at $SRC_ROOT/symprint — run 'make build' first"
           fi
         runOnlyWhenInstalling: false
         basedOnDependencyAnalysis: false
