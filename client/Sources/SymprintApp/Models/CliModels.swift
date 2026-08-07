@@ -39,6 +39,12 @@ struct CliProfile: Codable, Identifiable, Hashable {
     }
 }
 
+// MARK: - Validate Result (frontmatter contract check)
+struct ValidateResult: Codable {
+    let profile: String
+    let ok: Bool
+}
+
 // MARK: - Render Result
 struct RenderResult: Codable, Hashable {
     let outputPath: String

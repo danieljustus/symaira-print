@@ -206,6 +206,33 @@ make client-build  # xcodebuild the Symprint scheme
 make client-dmg    # package a .dmg (scripts/package-dmg.sh)
 ```
 
+### Installing the app and using the Finder integration
+
+The app ships as `Symprint.dmg` attached to each
+[GitHub release](https://github.com/danieljustus/symaira-print/releases):
+
+1. Download `Symprint.dmg`, open it and drag **Symaira Print** into
+   `/Applications` (or anywhere LaunchServices scans).
+2. Launch the app once — this registers the bundle with LaunchServices.
+3. Right-click any `.md` file → **Open With → Symaira Print**. The app opens
+   the file and renders it with the profile named in its frontmatter (or the
+   selected profile). You can also double-click a `.md` file, drag it onto the
+   Dock icon, or run `open -a "Symaira Print" path/to/document.md`.
+
+The app registers itself as an *alternate* handler only — it never becomes the
+default app for `.md` or plain text files.
+
+If the *Open With* entry does not appear (LaunchServices cache is stale after
+reinstalling or moving the app), re-register it manually:
+
+```bash
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f -R /Applications/Symprint.app
+```
+
+Note: builds are ad-hoc signed (`CODE_SIGN_IDENTITY: "-"` locally); on other
+Macs Gatekeeper may warn until the app is notarized. Notarization is part of
+the release pipeline (`release.yml`).
+
 See [`AGENTS.md`](AGENTS.md#macos-client-client) for the client's conventions.
 
 ## Development
