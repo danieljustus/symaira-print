@@ -1,7 +1,7 @@
 # Agent Instructions — symaira-print
 
 Markdown → beautiful PDF via named use-case profiles. Binary: `symprint`.
-Go 1.26.4, `CGO_ENABLED=0`, Apache-2.0. Part of the Symaira ecosystem.
+Go 1.26.5, `CGO_ENABLED=0`, Apache-2.0. Part of the Symaira ecosystem.
 
 ## Build & test
 
