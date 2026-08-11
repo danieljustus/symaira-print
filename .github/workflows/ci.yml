@@ -79,7 +79,7 @@ jobs:
         with:
           go-version: '1.26.5'
       - name: Install Typst
-        uses: typst-community/setup-typst@63ac138db421d586de61f7f5ac3bcef6a2e6c78c # v5
+        uses: typst-community/setup-typst@40d32bb6ccb235bd7f5164cb47cfd40a5ea3a314 # v5
         with:
           typst-version: '0.15.0'
       - name: Build
