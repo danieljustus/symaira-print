@@ -256,8 +256,8 @@ test. End-to-end render of all four profiles verified.
 - A `symprint init <profile>` scaffolder that emits a starter `.md`.
 - Homebrew formula via the tap (`depends_on "typst"`); editor snippets.
 - Optional WeasyPrint/CSS profile for HTML-shaped content.
-- Evaluate a Pro tier (hosted render API / branded template packs) consistent
-  with the public/Pro boundary — **no commercial code in this public repo.**
+- No hosted render API and no paid tier: `symprint` ships as one tool, and
+  **no commercial code belongs in this repo.**
 
 ## 8. Open questions & risks
 
